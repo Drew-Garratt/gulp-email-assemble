@@ -1,0 +1,12 @@
+{
+  "name": "DrewGarratt/dev.gulp-email-workflow",
+  "authors": [
+    "Drew Linzmaier-Garratt <drew@cunning.as>"
+  ],
+  "license": "MIT",
+  "private": true,
+  "dependencies": {
+    "normalize-css": "^4.2.0"
+  },
+  "overrides": {}
+}
