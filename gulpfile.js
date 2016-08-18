@@ -21,7 +21,7 @@ var rev          = require('gulp-rev');
 var runSequence  = require('run-sequence');
 var sass         = require('gulp-sass');
 var sourcemaps   = require('gulp-sourcemaps');
-var uglify       = require('gulp-uglify');
+var rename       = require('gulp-rename');
 
 var assemble     = require('assemble');
 var extname      = require('gulp-extname');
@@ -29,37 +29,11 @@ var htmlmin      = require('gulp-htmlmin');
 var juice        = require('gulp-juice-concat-enhanced');
 var assmbleApp   = assemble();
 
-// See https://github.com/austinpray/asset-builder
-var manifest = require('asset-builder')('./src/assets/manifest.json');
-
-// `paths` - paths to base asset directories. With trailing slashes.
-// - `paths.source` - paths to the source files. Default: `assets/`
-// - `paths.dist` - paths to the build directory. Default: `dist/`
-var paths = manifest.paths;
-
 var emailsPath = './src/emails';
 
-// `config` - Store arbitrary configuration values here.
-var config = manifest.config || {};
-
-// `globs` - These ultimately end up in their respective `gulp.src`.
-// - `globs.js` - Array of asset-builder JS dependency objects. Example:
-//   ```
-//   {type: 'js', name: 'main.js', globs: []}
-//   ```
-// - `globs.css` - Array of asset-builder CSS dependency objects. Example:
-//   ```
-//   {type: 'css', name: 'main.css', globs: []}
-//   ```
-// - `globs.fonts` - Array of font paths globs.
-// - `globs.images` - Array of image paths globs.
-// - `globs.bower` - Array of all the main Bower files.
-var globs = manifest.globs;
-
-// `project` - paths to first-party assets.
-// - `project.js` - Array of first-party JS assets.
-// - `project.css` - Array of first-party CSS assets.
-var project = manifest.getProjectGlobs();
+var paths = {};
+paths.src = './src';
+paths.dist = './dist';
 
 // CLI options
 var enabled = {
@@ -74,9 +48,6 @@ var enabled = {
   // Strip debug statments from javascript when `--production`
   stripJSDebug: argv.production
 };
-
-// paths to the compiled assets manifest in the dist directory
-var revManifest = paths.dist + 'assets.json';
 
 // ## Reusable Pipelines
 // See https://github.com/OverZealous/lazypipe
@@ -128,46 +99,15 @@ var cssTasks = function(filename) {
     })();
 };
 
-// ### JS processing pipeline
-// Example
-// ```
-// gulp.src(jsFiles)
-//   .pipe(jsTasks('main.js')
-//   .pipe(gulp.dest(paths.dist + 'scripts'))
-// ```
-var jsTasks = function(filename) {
+var assembleOutput = function(dir,filename) {
   return lazypipe()
     .pipe(function() {
-      return gulpif(enabled.maps, sourcemaps.init());
+      return assmbleApp.toStream('pages')
     })
-    .pipe(concat, filename)
-    .pipe(uglify, {
-      compress: {
-        'drop_debugger': enabled.stripJSDebug
-      }
-    })
-    .pipe(function() {
-      return gulpif(enabled.rev, rev());
-    })
-    .pipe(function() {
-      return gulpif(enabled.maps, sourcemaps.write('.', {
-        sourceRoot: paths.source + 'assets/scripts/'
-      }));
-    })();
-};
-
-// ### Write to rev manifest
-// If there are any revved files then write them to the rev manifest.
-// See https://github.com/sindresorhus/gulp-rev
-var writeToManifest = function(directory) {
-  return lazypipe()
-    .pipe(gulp.dest, paths.dist + directory)
-    .pipe(browserSync.stream, {match: '**/*.{js,css}'})
-    .pipe(rev.manifest, revManifest, {
-      base: paths.dist,
-      merge: true
-    })
-    .pipe(gulp.dest, paths.dist)();
+    .pipe(assmbleApp.renderFile())
+    .pipe(htmlmin())
+    .pipe(extname())
+    .pipe(assmbleApp.dest(paths.dist));
 };
 
 // ### Get folders for iteration
@@ -177,6 +117,18 @@ function getFolders(dir) {
       return fs.statSync(path.join(dir, file)).isDirectory();
     });
 }
+
+// ### Assemble App Collection Update
+function assembleFolder(folder) {
+  var folders = getFolders(emailsPath);
+    
+  //Update Assemble App Sources
+  assmbleApp.partials([path.join(emailsPath, folder, '/templates/partials/**/*.hbs'),'./src/shared/templates/partials/**/*.hbs']);
+  assmbleApp.layouts([path.join(emailsPath, folder, '/templates/layouts/**/*.hbs'),'./src/shared/templates/layouts/**/*.hbs']);
+  assmbleApp.pages(path.join(emailsPath, folder, '/templates/pages/**/*.hbs'));
+  assmbleApp.data([path.join(emailsPath, folder, '/data/**/*.{json,yml}'),'./src/shared/data/**/*.{json,yml}']);
+  assmbleApp.option('layout', 'base');
+};
 
 // ## Gulp tasks
 // Run `gulp -T` for a task summary
@@ -199,22 +151,7 @@ gulp.task('styles', ['wiredep'], function() {
       .pipe(cssTasksInstance));
   });
   return merged
-    .pipe(writeToManifest('styles'));
-});
-
-// ### Scripts
-// `gulp scripts` - Runs JSHint then compiles, combines, and optimizes Bower JS
-// and project JS.
-gulp.task('scripts', ['jshint'], function() {
-  var merged = merge();
-  manifest.forEachDependency('js', function(dep) {
-    merged.add(
-      gulp.src(dep.globs, {base: 'assets/scripts'})
-        .pipe(jsTasks(dep.name))
-    );
-  });
-  return merged
-    .pipe(writeToManifest('scripts'));
+    .pipe(gulp.dest, paths.dist)();
 });
 
 // ### Fonts
@@ -246,8 +183,8 @@ gulp.task('assemble', function() {
   var tasks = folders.map(function(folder) {
   
     //Update Assemble App Sources
-    assmbleApp.partials(path.join(emailsPath, folder, '/templates/partials/**/*.hbs','./src/shared/templates/partials/**/*.hbs'));
-    assmbleApp.layouts(path.join(emailsPath, folder, '/templates/layouts/**/*.hbs','./src/shared/templates/layouts/**/*.{json,yml}'));
+    assmbleApp.partials([path.join(emailsPath, folder, '/templates/partials/**/*.hbs'),'./src/shared/templates/partials/**/*.hbs']);
+    assmbleApp.layouts([path.join(emailsPath, folder, '/templates/layouts/**/*.hbs'),'./src/shared/templates/layouts/**/*.hbs}']);
     assmbleApp.pages(path.join(emailsPath, folder, '/templates/pages/**/*.hbs'));
     assmbleApp.data([path.join(emailsPath, folder, '/data/**/*.{json,yml}'),'./src/shared/data/**/*.{json,yml}']);
     assmbleApp.option('layout', 'base');
@@ -296,9 +233,48 @@ gulp.task('serve', function() {
   //gulp.watch([paths.source + 'scripts/**/*'], ['jshint', 'scripts']);
   //gulp.watch([paths.source + 'fonts/**/*'], ['fonts']);
   //gulp.watch([paths.source + 'images/**/*'], ['images']);
-  gulp.watch(['src/{data,templates}/**/*'], ['assemble']);
-  gulp.watch('dist/*.html', htmlInjector);
+  
+  gulp.watch('dist/**/*.html', htmlInjector);
   gulp.watch(['bower.json', paths.source + 'assets/manifest.json'], ['build']);
+  
+  //Email Folder Watch
+  gulp.watch('src/emails/**/*.{hbs,json,yml}').on('change', function (file) {
+    var pathArray = file.path.split(path.sep);
+    var emailPathPos = pathArray.indexOf("emails");
+    var currentFolder = pathArray[emailPathPos+1];
+    
+    assembleFolder(currentFolder);
+    
+    return assmbleApp.toStream('pages')
+      .pipe(assmbleApp.renderFile())
+      .pipe(htmlmin())
+      .pipe(extname())
+      .pipe(rename({
+        dirname: currentFolder
+      }))
+      .pipe(assmbleApp.dest(paths.dist));
+  });
+  
+  //Shared Folder Watch
+  gulp.watch('src/shared/**/*.{hbs,json,yml}').on('change', function (file) {
+    var folders = getFolders(emailsPath);
+  
+    var tasks = folders.map(function(folder) {
+      assembleFolder(folder);
+      
+      console.log(folder);
+      
+      return assmbleApp.toStream('pages')
+      .pipe(assmbleApp.renderFile())
+      .pipe(htmlmin())
+      .pipe(extname())
+      .pipe(rename({
+        dirname: folder
+      }))
+      .pipe(assmbleApp.dest(paths.dist));
+    });
+  });
+  
 });
 
 // ### Build
