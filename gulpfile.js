@@ -1,6 +1,7 @@
 // ## Globals
 var fs           = require('fs');
 var path         = require('path');
+var del          = require('del');
 var argv         = require('minimist')(process.argv.slice(2));
 var autoprefixer = require('gulp-autoprefixer');
 var browserSync  = require('browser-sync').create();
@@ -27,10 +28,10 @@ var assemble     = require('assemble');
 var extname      = require('gulp-extname');
 var htmlmin      = require('gulp-htmlmin');
 var juice        = require('gulp-juice-concat-enhanced');
-var assmbleApp   = assemble();
 
 var emailsPath = './src/emails';
 
+var assmbleApps = [];
 var paths = {};
 paths.src = './src';
 paths.dist = './dist';
@@ -118,17 +119,35 @@ function getFolders(dir) {
     });
 }
 
+// ### Get current folder of watch type
+function getCurrentFolder(filePath,type) {
+  var pathArray = filePath.split(path.sep);
+  var emailPathPos = pathArray.indexOf(type);
+  var currentFolder = pathArray[emailPathPos+1];
+  return currentFolder;
+}
+
 // ### Assemble App Collection Update
-function assembleFolder(folder) {
-  var folders = getFolders(emailsPath);
-    
+function assembleFolder(dir) {
   //Update Assemble App Sources
-  assmbleApp.partials([path.join(emailsPath, folder, '/templates/partials/**/*.hbs'),'./src/shared/templates/partials/**/*.hbs']);
-  assmbleApp.layouts([path.join(emailsPath, folder, '/templates/layouts/**/*.hbs'),'./src/shared/templates/layouts/**/*.hbs']);
-  assmbleApp.pages(path.join(emailsPath, folder, '/templates/pages/**/*.hbs'));
-  assmbleApp.data([path.join(emailsPath, folder, '/data/**/*.{json,yml}'),'./src/shared/data/**/*.{json,yml}']);
-  assmbleApp.option('layout', 'base');
+  assmbleApps[dir] = assemble();
+  assmbleApps[dir].partials([path.join(emailsPath, dir, '/templates/partials/**/*.hbs'),'./src/shared/templates/partials/**/*.hbs']);
+  assmbleApps[dir].layouts([path.join(emailsPath, dir, '/templates/layouts/**/*.hbs'),'./src/shared/templates/layouts/**/*.hbs']);
+  assmbleApps[dir].pages(path.join(emailsPath, dir, '/templates/pages/**/*.hbs'));
+  assmbleApps[dir].data([path.join(emailsPath, dir, '/data/**/*.{json,yml}'),'./src/shared/data/**/*.{json,yml}']);
+  assmbleApps[dir].option('layout', 'base');
 };
+
+function assembleJuice(dir) {    
+  return assmbleApps[dir].toStream('pages')
+    .pipe(assmbleApps[dir].renderFile())
+    .pipe(htmlmin())
+    .pipe(extname())
+    .pipe(rename({
+      dirname: dir
+    }))
+    .pipe(assmbleApps[dir].dest(paths.dist));
+}
 
 // ## Gulp tasks
 // Run `gulp -T` for a task summary
@@ -227,8 +246,16 @@ gulp.task('serve', function() {
   });
   browserSync.init({
     port: 8080,
-    server: "dist"
+    server: "./",
+    startPath: "/preview"
   });
+  //Init Apps
+  var folders = getFolders(emailsPath);
+  var tasks = folders.map(function(folder) {
+    assmbleApps[folder] = assemble();
+    assembleFolder(folder);
+  });
+  
   //gulp.watch([paths.source + 'styles/**/*'], ['styles']);
   //gulp.watch([paths.source + 'scripts/**/*'], ['jshint', 'scripts']);
   //gulp.watch([paths.source + 'fonts/**/*'], ['fonts']);
@@ -239,20 +266,62 @@ gulp.task('serve', function() {
   
   //Email Folder Watch
   gulp.watch('src/emails/**/*.{hbs,json,yml}').on('change', function (file) {
-    var pathArray = file.path.split(path.sep);
-    var emailPathPos = pathArray.indexOf("emails");
-    var currentFolder = pathArray[emailPathPos+1];
+    var currentFolder = getCurrentFolder(file.path,'emails');
     
-    assembleFolder(currentFolder);
+    console.log(file);
     
-    return assmbleApp.toStream('pages')
-      .pipe(assmbleApp.renderFile())
-      .pipe(htmlmin())
-      .pipe(extname())
-      .pipe(rename({
-        dirname: currentFolder
-      }))
-      .pipe(assmbleApp.dest(paths.dist));
+    switch (file.type) {
+      case "added":
+        assembleFolder(currentFolder)
+        assembleJuice(currentFolder);
+      
+        break;
+        
+      case "renamed":
+        //Remove old
+        var oldPathArray = file.old.split(path.sep);
+        var oldFilename = oldPathArray[oldPathArray.length-1];
+        
+        oldFilename = oldFilename.substr(0, oldFilename.lastIndexOf('.'));
+        
+        var oldFilePath = currentFolder + path.sep + oldFilename + ".html";
+        
+        var oldDestFilePath = path.resolve(paths.dist, oldFilePath);
+        
+        console.log(oldDestFilePath);
+        
+        return del(oldDestFilePath);
+        
+        //Add new
+        assembleFolder(currentFolder)
+        assembleJuice(currentFolder);
+      
+        break;
+        
+      case "deleted":
+        
+        var pathArray = file.path.split(path.sep);
+        var filename = pathArray[pathArray.length-1];
+        filename = filename.substr(0, filename.lastIndexOf('.'));
+        
+        var filePath = currentFolder + path.sep + filename + ".html";
+        
+        var destFilePath = path.resolve(paths.dist, filePath);
+        
+        console.log(destFilePath);
+        
+        return del(destFilePath);
+        
+        assembleFolder(currentFolder)
+        assembleJuice(currentFolder);
+      
+        break;
+        
+      case "changed":
+        assembleJuice(currentFolder);
+      
+        break;
+    }
   });
   
   //Shared Folder Watch
