@@ -34,9 +34,22 @@ var juice        = require('gulp-juice-concat-enhanced');
 var emailsPath = './src/emails';
 
 var assmbleApps = [];
-var paths = {};
-paths.src = './src';
-paths.dist = './dist';
+var paths = {
+  src: './src',
+  assemble: './assemble',
+  dist: './dist',
+};
+
+var juiceOptions = {
+  preserveMediaQueries: true,
+  applyAttributesTableElements: true,
+  applyWidthAttributes: true,
+  preserveImportant: true,
+  preserveFontFaces: true,
+  webResources: {
+    images: false
+  }
+}
 
 // CLI options
 var enabled = {
@@ -98,15 +111,31 @@ var cssTasks = lazypipe()
 //   .pipe(cssTasks('main.css')
 //   .pipe(gulp.dest(paths.dist + 'styles'))
 // ```
-var assembleOutput = function(dir) {
-  return lazypipe()
-    .pipe(function() {
-      return assmbleApps[dir].toStream('pages')
-        .pipe(assmbleApps[dir].renderFile())
-        .pipe(htmlmin())
-        .pipe(extname())
-    })();
+function assembleOutput(dir) {
+  
+  gulp.task('assembleEmail', function() {
+    return assmbleApps[dir].toStream('pages')
+      .pipe(assmbleApps[dir].renderFile())
+      .pipe(htmlmin())
+      .pipe(extname())
+      .pipe(rename({
+        dirname: dir
+      }))
+      .pipe(assmbleApps[dir].dest(paths.assemble));
+  });
+  
+  gulp.task('juiceEmail', function() {  
+    return gulp.src(path.join(paths.assemble, dir, '/**/*.html'))
+      .pipe(juice(juiceOptions))
+      .pipe(rename({
+        dirname: dir
+      }))
+      .pipe(gulp.dest(paths.dist));
+  });
+  
+  runSequence('assembleEmail','juiceEmail');
 };
+
 
 // ### Get folders for iteration
 function getFolders(dir) {
@@ -160,11 +189,12 @@ gulp.task('serve', function() {
   // register the plugin
   browserSync.use(htmlInjector, {
     // Files to watch that will trigger the injection
-    files: "dist/*.html" 
+    files: "dist/*.html, preview/*.html" 
   });
   browserSync.init({
     port: 8080,
     server: "./",
+    codeSync: false,
     startPath: "/preview"
   });
   //Init Apps
@@ -186,18 +216,19 @@ gulp.task('serve', function() {
   gulp.watch('src/emails/**/styles/**/*.{scss,less}').on('change', function (file) {
     var currentFolder = getCurrentFolder(file.path,'emails');
     var stylePath = path.join(emailsPath, currentFolder, '/styles/**/*.scss');
-    console.log(file);
-    console.log(stylePath);
+    
     gulp.src(stylePath)
       .pipe(cssTasks)      
       .pipe(rename({
         dirname: currentFolder + '/styles'
       }))
       .pipe(gulp.dest(paths.dist));
+      
+    assembleOutput(currentFolder);
   });
   
   //Email Folder Watch
-  gulp.watch('src/emails/**/*.{hbs,json,yml}').on('change', function (file) {
+  gulp.watch('src/emails/**/*.{hbs,json,yml}', htmlInjector).on('change', function (file) {
     var currentFolder = getCurrentFolder(file.path,'emails');
     var timeName = '';
     
@@ -253,12 +284,8 @@ gulp.task('serve', function() {
         var timeName = 'Email:'+currentFolder+' -html changed';
         console.time(timeName);
         
-        assembleOutput(currentFolder)
-          .pipe(juice({}))
-          .pipe(rename({
-            dirname: currentFolder
-          }))
-          .pipe(gulp.dest(paths.dist));
+        assembleFolder(currentFolder);
+        assembleOutput(currentFolder);
       
         break;
     }

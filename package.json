@@ -18,6 +18,7 @@
     "npm": ">=2.15.8"
   },
   "devDependencies": {
+    "@thasmo/gulp-juice": "thasmo/gulp.juice",
     "assemble": "^0.17.1",
     "asset-builder": "^1.1.0",
     "browser-sync": "^2.14.0",
@@ -36,6 +37,7 @@
     "gulp-if": "^2.0.0",
     "gulp-imagemin": "^3.0.2",
     "gulp-jshint": "^2.0.0",
+    "gulp-juice": "^0.1.0",
     "gulp-juice-concat-enhanced": "^1.2.2",
     "gulp-less": "^3.0.3",
     "gulp-plumber": "^1.0.1",
@@ -51,6 +53,7 @@
     "run-sequence": "^1.1.2",
     "sanitize.css": "^4.1.0",
     "traverse": "^0.6.6",
+    "web-resource-inliner": "^2.0.0",
     "wiredep": "^4.0.0"
   }
 }
