@@ -2,6 +2,8 @@
 var fs           = require('fs');
 var path         = require('path');
 var del          = require('del');
+var colors       = require('colors');
+
 var argv         = require('minimist')(process.argv.slice(2));
 var autoprefixer = require('gulp-autoprefixer');
 var browserSync  = require('browser-sync').create();
@@ -12,13 +14,13 @@ var flatten      = require('gulp-flatten');
 var gulp         = require('gulp');
 var gulpif       = require('gulp-if');
 var imagemin     = require('gulp-imagemin');
-var jshint       = require('gulp-jshint');
+//var jshint       = require('gulp-jshint');
 var lazypipe     = require('lazypipe');
 var less         = require('gulp-less');
-var merge        = require('merge-stream');
+//var merge        = require('merge-stream');
 var cssNano      = require('gulp-cssnano');
 var plumber      = require('gulp-plumber');
-var rev          = require('gulp-rev');
+//var rev          = require('gulp-rev');
 var runSequence  = require('run-sequence');
 var sass         = require('gulp-sass');
 var sourcemaps   = require('gulp-sourcemaps');
@@ -60,55 +62,55 @@ var enabled = {
 //   .pipe(cssTasks('main.css')
 //   .pipe(gulp.dest(paths.dist + 'styles'))
 // ```
-var cssTasks = function(filename) {
-  return lazypipe()
-    .pipe(function() {
-      return gulpif(!enabled.failStyleTask, plumber());
-    })
-    .pipe(function() {
-      return gulpif(enabled.maps, sourcemaps.init());
-    })
-    .pipe(function() {
-      return gulpif('*.less', less());
-    })
-    .pipe(function() {
-      return gulpif('*.scss', sass({
-        outputStyle: 'nested', // libsass doesn't support expanded yet
-        precision: 10,
-        includepaths: ['.'],
-        errLogToConsole: !enabled.failStyleTask
-      }));
-    })
-    .pipe(concat, filename)
-    .pipe(autoprefixer, {
-      browsers: [
-        'last 2 versions',
-        'android 4',
-        'opera 12'
-      ]
-    })
-    .pipe(cssNano, {
-      safe: true
-    })
-    .pipe(function() {
-      return gulpif(enabled.rev, rev());
-    })
-    .pipe(function() {
-      return gulpif(enabled.maps, sourcemaps.write('.', {
-        sourceRoot: paths.source + '/assets/styles/'
-      }));
-    })();
-};
+var cssTasks = lazypipe()
+  .pipe(function() {
+    return gulpif(!enabled.failStyleTask, plumber());
+  })
+  .pipe(function() {
+    return gulpif(enabled.maps, sourcemaps.init());
+  })
+  .pipe(function() {
+    return gulpif('*.less', less());
+  })
+  .pipe(function() {
+    return gulpif('*.scss', sass({
+      outputStyle: 'nested', // libsass doesn't support expanded yet
+      precision: 10,
+      includepaths: ['.'],
+      errLogToConsole: !enabled.failStyleTask
+    }));
+  })
+  .pipe(autoprefixer, {
+    browsers: [
+      'last 2 versions',
+      'android 4',
+      'opera 12'
+    ]
+  })
+  .pipe(cssNano, {
+    safe: true
+  })();
 
-var assembleOutput = function(dir,filename) {
+// ### CSS processing pipeline
+// Example
+// ```
+// gulp.src(cssFiles)
+//   .pipe(cssTasks('main.css')
+//   .pipe(gulp.dest(paths.dist + 'styles'))
+// ```
+
+var assembleOutput = function(dir) {
   return lazypipe()
     .pipe(function() {
-      return assmbleApp.toStream('pages')
-    })
-    .pipe(assmbleApp.renderFile())
-    .pipe(htmlmin())
-    .pipe(extname())
-    .pipe(assmbleApp.dest(paths.dist));
+      return assmbleApps[dir].toStream('pages')
+        .pipe(assmbleApps[dir].renderFile())
+        .pipe(htmlmin())
+        .pipe(extname())
+        .pipe(rename({
+          dirname: dir
+        }))
+        .pipe(assmbleApps[dir].dest(paths.dist));
+    })();
 };
 
 // ### Get folders for iteration
@@ -138,17 +140,6 @@ function assembleFolder(dir) {
   assmbleApps[dir].option('layout', 'base');
 };
 
-function assembleJuice(dir) {    
-  return assmbleApps[dir].toStream('pages')
-    .pipe(assmbleApps[dir].renderFile())
-    .pipe(htmlmin())
-    .pipe(extname())
-    .pipe(rename({
-      dirname: dir
-    }))
-    .pipe(assmbleApps[dir].dest(paths.dist));
-}
-
 // ## Gulp tasks
 // Run `gulp -T` for a task summary
 
@@ -156,77 +147,9 @@ function assembleJuice(dir) {
 // `gulp styles` - Compiles, combines, and optimizes Bower CSS and project CSS.
 // By default this task will only log a warning if a precompiler error is
 // raised. If the `--production` flag is set: this task will fail outright.
-gulp.task('styles', ['wiredep'], function() {
-  var merged = merge();
-  manifest.forEachDependency('css', function(dep) {
-    var cssTasksInstance = cssTasks(dep.name);
-    if (!enabled.failStyleTask) {
-      cssTasksInstance.on('error', function(err) {
-        console.error(err.message);
-        this.emit('end');
-      });
-    }
-    merged.add(gulp.src(dep.globs, {base: 'assets/styles'})
-      .pipe(cssTasksInstance));
-  });
-  return merged
-    .pipe(gulp.dest, paths.dist)();
-});
-
-// ### Fonts
-// `gulp fonts` - Grabs all the fonts and outputs them in a flattened directory
-// structure. See: https://github.com/armed/gulp-flatten
-gulp.task('fonts', function() {
-  return gulp.src(globs.fonts)
-    .pipe(flatten())
-    .pipe(gulp.dest(paths.dist + 'fonts'))
-    .pipe(browserSync.stream());
-});
 
 // ### Images
 // `gulp images` - Run lossless compression on all the images.
-gulp.task('images', function() {
-  return gulp.src(globs.images)
-    .pipe(imagemin({
-      progressive: true,
-      interlaced: true,
-      svgoPlugins: [{removeUnknownsAndDefaults: false}, {cleanupIDs: false}]
-    }))
-    .pipe(gulp.dest(paths.dist + 'images'))
-    .pipe(browserSync.stream());
-});
-
-gulp.task('assemble', function() {
-  var folders = getFolders(emailsPath);
-
-  var tasks = folders.map(function(folder) {
-  
-    //Update Assemble App Sources
-    assmbleApp.partials([path.join(emailsPath, folder, '/templates/partials/**/*.hbs'),'./src/shared/templates/partials/**/*.hbs']);
-    assmbleApp.layouts([path.join(emailsPath, folder, '/templates/layouts/**/*.hbs'),'./src/shared/templates/layouts/**/*.hbs}']);
-    assmbleApp.pages(path.join(emailsPath, folder, '/templates/pages/**/*.hbs'));
-    assmbleApp.data([path.join(emailsPath, folder, '/data/**/*.{json,yml}'),'./src/shared/data/**/*.{json,yml}']);
-    assmbleApp.option('layout', 'base');
-    
-    //Run Assemble stream
-    return assmbleApp.toStream('pages')
-      .pipe(assmbleApp.renderFile())
-      .pipe(htmlmin())
-      .pipe(extname())
-      .pipe(assmbleApp.dest(paths.dist));
-  });
-});
-
-// ### JSHint
-// `gulp jshint` - Lints configuration JSON and project JS.
-gulp.task('jshint', function() {
-  return gulp.src([
-    'bower.json', 'gulpfile.js'
-  ].concat(project.js))
-    .pipe(jshint())
-    .pipe(jshint.reporter('jshint-stylish'))
-    .pipe(gulpif(enabled.failJSHint, jshint.reporter('fail')));
-});
 
 // ### Clean
 // `gulp clean` - Deletes the build folder entirely.
@@ -264,84 +187,95 @@ gulp.task('serve', function() {
   gulp.watch('dist/**/*.html', htmlInjector);
   gulp.watch(['bower.json', paths.source + 'assets/manifest.json'], ['build']);
   
+  //Styles Folder Watch
+  gulp.watch('src/emails/**/styles/**/*.{scss,less}').on('change', function (file) {
+    var currentFolder = getCurrentFolder(file.path,'emails');
+    
+    gulp.src(currentFolder+'/**/*.scss')
+      .pipe(cssTasks)      
+      .pipe(rename({
+        dirname: currentFolder + 'styles'
+      }))
+      .pipe(gulp.dest(paths.dist));
+  });
+  
   //Email Folder Watch
   gulp.watch('src/emails/**/*.{hbs,json,yml}').on('change', function (file) {
     var currentFolder = getCurrentFolder(file.path,'emails');
-    
-    console.log(file);
+    var timeName = '';
     
     switch (file.type) {
       case "added":
-        assembleFolder(currentFolder)
-        assembleJuice(currentFolder);
-      
+        var timeName = 'Email '+currentFolder+' -html added';
+        console.time(timeName);
+        
+        assembleFolder(currentFolder);
+        assembleOutput(currentFolder);
+        
         break;
         
       case "renamed":
+        var timeName = 'Email:'+currentFolder+' -html renamed';
+        console.time(timeName);
+        
         //Remove old
         var oldPathArray = file.old.split(path.sep);
         var oldFilename = oldPathArray[oldPathArray.length-1];
-        
         oldFilename = oldFilename.substr(0, oldFilename.lastIndexOf('.'));
         
         var oldFilePath = currentFolder + path.sep + oldFilename + ".html";
-        
         var oldDestFilePath = path.resolve(paths.dist, oldFilePath);
         
-        console.log(oldDestFilePath);
-        
-        return del(oldDestFilePath);
+        del(oldDestFilePath);
         
         //Add new
-        assembleFolder(currentFolder)
-        assembleJuice(currentFolder);
+        assembleFolder(currentFolder);
+        assembleOutput(currentFolder);
       
         break;
         
       case "deleted":
+        var timeName = 'Email:'+currentFolder+' -html deleted';
+        console.time(timeName);
         
         var pathArray = file.path.split(path.sep);
         var filename = pathArray[pathArray.length-1];
         filename = filename.substr(0, filename.lastIndexOf('.'));
         
         var filePath = currentFolder + path.sep + filename + ".html";
-        
         var destFilePath = path.resolve(paths.dist, filePath);
         
-        console.log(destFilePath);
+        del(destFilePath);
         
-        return del(destFilePath);
-        
-        assembleFolder(currentFolder)
-        assembleJuice(currentFolder);
+        assembleFolder(currentFolder);
+        assembleOutput(currentFolder);
       
         break;
         
       case "changed":
-        assembleJuice(currentFolder);
+        var timeName = 'Email:'+currentFolder+' -html changed';
+        console.time(timeName);
+        
+        assembleOutput(currentFolder);
       
         break;
     }
+    console.timeEnd(timeName);
   });
   
-  //Shared Folder Watch
+  //Shared Email Folder Watch
   gulp.watch('src/shared/**/*.{hbs,json,yml}').on('change', function (file) {
     var folders = getFolders(emailsPath);
-  
-    var tasks = folders.map(function(folder) {
-      assembleFolder(folder);
-      
-      console.log(folder);
-      
-      return assmbleApp.toStream('pages')
-      .pipe(assmbleApp.renderFile())
-      .pipe(htmlmin())
-      .pipe(extname())
-      .pipe(rename({
-        dirname: folder
-      }))
-      .pipe(assmbleApp.dest(paths.dist));
+    
+    var timeName = 'Shared Email -html changed';
+    console.time(timeName);
+    
+    var tasks = folders.map(function(currentFolder) {
+      assembleFolder(currentFolder);
+      assembleOutput(currentFolder);
     });
+    
+    console.timeEnd(timeName);
   });
   
 });
@@ -355,19 +289,6 @@ gulp.task('build', function(callback) {
               ['fonts', 'images'],
               'assemble',
               callback);
-});
-
-// ### Wiredep
-// `gulp wiredep` - Automatically inject Less and Sass Bower dependencies. See
-// https://github.com/taptapship/wiredep
-gulp.task('wiredep', function() {
-  var wiredep = require('wiredep').stream;
-  return gulp.src(project.css)
-    .pipe(wiredep())
-    .pipe(changed(paths.source + 'styles', {
-      hasChanged: changed.compareSha1Digest
-    }))
-    .pipe(gulp.dest(paths.source + 'styles'));
 });
 
 // ### Gulp
