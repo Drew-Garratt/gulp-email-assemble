@@ -98,7 +98,6 @@ var cssTasks = lazypipe()
 //   .pipe(cssTasks('main.css')
 //   .pipe(gulp.dest(paths.dist + 'styles'))
 // ```
-
 var assembleOutput = function(dir) {
   return lazypipe()
     .pipe(function() {
@@ -106,10 +105,6 @@ var assembleOutput = function(dir) {
         .pipe(assmbleApps[dir].renderFile())
         .pipe(htmlmin())
         .pipe(extname())
-        .pipe(rename({
-          dirname: dir
-        }))
-        .pipe(assmbleApps[dir].dest(paths.dist));
     })();
 };
 
@@ -190,11 +185,13 @@ gulp.task('serve', function() {
   //Styles Folder Watch
   gulp.watch('src/emails/**/styles/**/*.{scss,less}').on('change', function (file) {
     var currentFolder = getCurrentFolder(file.path,'emails');
-    
-    gulp.src(currentFolder+'/**/*.scss')
+    var stylePath = path.join(emailsPath, currentFolder, '/styles/**/*.scss');
+    console.log(file);
+    console.log(stylePath);
+    gulp.src(stylePath)
       .pipe(cssTasks)      
       .pipe(rename({
-        dirname: currentFolder + 'styles'
+        dirname: currentFolder + '/styles'
       }))
       .pipe(gulp.dest(paths.dist));
   });
@@ -256,7 +253,12 @@ gulp.task('serve', function() {
         var timeName = 'Email:'+currentFolder+' -html changed';
         console.time(timeName);
         
-        assembleOutput(currentFolder);
+        assembleOutput(currentFolder)
+          .pipe(juice({}))
+          .pipe(rename({
+            dirname: currentFolder
+          }))
+          .pipe(gulp.dest(paths.dist));
       
         break;
     }
