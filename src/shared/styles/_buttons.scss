@@ -1,0 +1,64 @@
+/* -------------------------------------
+    BUTTONS
+------------------------------------- */
+
+.btn {
+  width: 100%;
+
+  > tr > td {
+    padding-bottom: $body-line-height;
+  }
+
+  table {
+    width: auto;
+  }
+
+  table td {
+    background-color: #ffffff;
+    border-radius: $btn-br;
+    text-align: center;
+  }
+
+  a{
+    background-color: #ffffff;
+    border: solid 1px $colour-primary;
+    border-radius: $btn-br;
+    color: $colour-primary;
+    cursor: pointer;
+    display: inline-block;
+    font-size: $body-font-size;
+    font-weight: bold;
+    margin: 0;
+    padding: round($body-font-size * 0.9) round($body-font-size * 1.8);
+    text-decoration: none;
+    text-transform: capitalize;
+  }
+}
+
+// Primary call to action button
+.btn-primary {
+
+  table td {
+    background-color: $colour-primary;
+  }
+
+  a{
+    background-color: $colour-primary;
+    border-color: $colour-primary;
+    color: #ffffff;
+  }
+}
+
+// Secondary button
+.btn-secondary {
+
+  table td {
+    background-color: transparent;
+  }
+
+  a{
+    background-color: transparent;
+    border-color: $colour-primary;
+    color: $colour-primary;
+  }
+}

@@ -1,0 +1,112 @@
+/* -------------------------------------
+    OTHER STYLES THAT MIGHT BE USEFUL
+------------------------------------- */
+
+.last {
+  padding-right: 0;
+}
+
+.first {
+  padding-left: 0;
+}
+
+.align-center {
+  text-align: center;
+}
+
+.align-right {
+  text-align: right;
+}
+
+.align-left {
+  text-align: left;
+}
+
+.clear {
+  clear: both;
+}
+
+.br {
+  font-size: $body-font-size;
+  line-height: $body-font-size;
+}
+
+//Font shorthand
+.f0 {
+  font-size: 0px;
+  line-height: 0px;
+}
+
+//Margin shorthand
+.mt0 {
+  margin-top: 0;
+}
+
+.mb0 {
+  margin-bottom: 0;
+}
+
+//Padding shorthand
+.p0 {
+  padding: 0;
+}
+
+.p0-all {
+  padding: 0;
+
+  td {
+    padding: 0;
+  }
+}
+
+.pt0 {
+  padding-top: 0;
+}
+
+.pr0 {
+  padding-right: 0;
+}
+
+.pb0 {
+  padding-bottom: 0;
+}
+
+.pl0 {
+  padding-left: 0;
+}
+
+//Sizing shorthand
+.full {
+  width: 100%;
+}
+
+.half {
+  width: 50%;
+}
+
+.third {
+  width: 33.33%;
+}
+
+.quarter {
+  width: 25%;
+}
+
+.fifth {
+  width: 20%;
+}
+
+
+// Preheader text is displayed in certain clients as a preview but not shown when the user opens the email
+.preheader {
+  color: transparent;
+  display: none;
+  height: 0;
+  max-height: 0;
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  mso-hide: all;
+  visibility: hidden;
+  width: 0;
+}

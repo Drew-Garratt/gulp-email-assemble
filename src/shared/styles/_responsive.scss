@@ -1,0 +1,59 @@
+/* -------------------------------------
+    RESPONSIVE AND MOBILE FRIENDLY STYLES
+------------------------------------- */
+
+table[class=body]{
+  @media only screen and (max-width: $width+$resPadding) {
+    // Container
+    .container {
+      width: 100% !important;
+    }
+
+    // Responsive Widths
+    .resFull {
+      width: 100% !important;
+      display: block;
+    }
+
+    .resHalf {
+      width: 50% !important;
+      display: block;
+    }
+
+    // Images
+    .imageFluid {
+      width: 100% !important;
+      height: auto !important;
+    }
+
+    // Buttons
+    .btn table,
+    .btn a {
+      width: 100% !important;
+    }
+  }
+}
+
+// Layout
+.columns {
+  padding: 0;
+  font-size: 0;
+  line-height: 0;
+  text-align: center;
+
+  .column, .col {
+    display: inline-block;
+    vertical-align: top;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    font-size: 0;
+    line-height: 0;
+    overflow: hidden;
+  }
+
+  .col {
+    vertical-align: top;
+  }
+}

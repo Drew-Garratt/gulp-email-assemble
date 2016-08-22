@@ -6,8 +6,6 @@ var colors       = require('colors');
 
 var argv         = require('minimist')(process.argv.slice(2));
 var autoprefixer = require('gulp-autoprefixer');
-var browserSync  = require('browser-sync').create();
-var htmlInjector = require("bs-html-injector");
 var changed      = require('gulp-changed');
 var concat       = require('gulp-concat');
 var flatten      = require('gulp-flatten');
@@ -15,8 +13,8 @@ var gulp         = require('gulp');
 var gulpif       = require('gulp-if');
 var imagemin     = require('gulp-imagemin');
 //var jshint       = require('gulp-jshint');
-var lazypipe     = require('lazypipe');
-var less         = require('gulp-less');
+//var lazypipe     = require('lazypipe');
+//var less         = require('gulp-less');
 //var merge        = require('merge-stream');
 var cssNano      = require('gulp-cssnano');
 var plumber      = require('gulp-plumber');
@@ -25,6 +23,7 @@ var runSequence  = require('run-sequence');
 var sass         = require('gulp-sass');
 var sourcemaps   = require('gulp-sourcemaps');
 var rename       = require('gulp-rename');
+var replace      = require('gulp-replace');
 var debug        = require('gulp-debug');
 
 var assemble     = require('assemble');
@@ -32,13 +31,19 @@ var extname      = require('gulp-extname');
 var htmlmin      = require('gulp-htmlmin');
 var juice        = require('gulp-juice-concat-enhanced');
 
-var emailsPath = './src/emails';
+var browserSync  = require('browser-sync').create();
+var htmlInjector = require("bs-html-injector");
+
+browserSync.use(htmlInjector)
 
 var assmbleApps = [];
+
 var paths = {
   src: './src',
   assemble: './assemble',
   dist: './dist',
+  emails: './src/emails',
+  shared: './src/shared'
 };
 
 var juiceOptions = {
@@ -66,44 +71,6 @@ var enabled = {
   stripJSDebug: argv.production
 };
 
-// ## Reusable Pipelines
-// See https://github.com/OverZealous/lazypipe
-
-// ### CSS processing pipeline
-// Example
-// ```
-// gulp.src(cssFiles)
-//   .pipe(cssTasks('main.css')
-//   .pipe(gulp.dest(paths.dist + 'styles'))
-// ```
-var cssTasks = lazypipe()
-  .pipe(function() {
-    return gulpif(!enabled.failStyleTask, plumber());
-  })
-  .pipe(function() {
-    return gulpif(enabled.maps, sourcemaps.init());
-  })
-  .pipe(function() {
-    return gulpif('*.less', less());
-  })
-  .pipe(function() {
-    return gulpif('*.scss', sass({
-      outputStyle: 'nested', // libsass doesn't support expanded yet
-      precision: 10,
-      includepaths: ['.'],
-      errLogToConsole: !enabled.failStyleTask
-    }));
-  })
-  .pipe(autoprefixer, {
-    browsers: [
-      'last 2 versions',
-      'android 4',
-      'opera 12'
-    ]
-  })
-  .pipe(cssNano, {
-    safe: true
-  })();
 
 // ### CSS processing pipeline
 // Example
@@ -117,6 +84,7 @@ function assembleOutput(dir, type) {
   
   gulp.task('assembleEmail', function() {
     return assmbleApps[dir].toStream('pages')
+      .pipe(debug({title: 'Assemble Email:'}))
       .pipe(assmbleApps[dir].renderFile())
       .pipe(htmlmin())
       .pipe(extname())
@@ -127,8 +95,21 @@ function assembleOutput(dir, type) {
   });
   
   gulp.task('assembleStyles', function() {  
-    return gulp.src(path.join(emailsPath, dir, '/styles/**/*.{scss,less}'))
-      .pipe(cssTasks)      
+    return gulp.src(path.join(paths.emails, dir, '/styles/**/*.scss'))
+      .pipe(debug({title: 'Assemble Sass:'}))
+      .pipe(sass({
+          outputStyle: 'nested', // libsass doesn't support expanded yet
+          precision: 10,
+          includePaths: path.join(paths.shared, '/styles')
+        })
+      )
+      .pipe(autoprefixer({
+        browsers: [
+          'last 2 versions',
+          'android 4',
+          'opera 12'
+        ]})
+      )     
       .pipe(rename({
         dirname: dir + '/styles'
       }))
@@ -137,30 +118,60 @@ function assembleOutput(dir, type) {
   
   gulp.task('juiceEmail', function() {  
     return gulp.src(path.join(paths.assemble, dir, '/**/*.html'))
+      .pipe(debug({title: 'Juice Email:'}))
       .pipe(juice(juiceOptions))
+      
+      .pipe(replace('[mso_open]', '<!--[if (gte mso 9)|(IE)]>'))
+      .pipe(replace('[mso_close]', '<![endif]-->'))
+      
+      .pipe(replace('[mso_open]', '<!--[if gte mso 11]>'))
+      .pipe(replace('[mso_close]', '<![endif]-->'))
+      
+      .pipe(replace('[mso_open]', '<!--[if !gte mso 11]><!---->'))
+      .pipe(replace('[mso_close]', '<!--<![endif]-->'))
+      
       .pipe(rename({
         dirname: dir
       }))
       .pipe(gulp.dest(paths.dist));
   });
+
   
   switch (type) {
     case "email":
-      runSequence('assembleEmail','juiceEmail');
+      runSequence('assembleEmail','juiceEmail',htmlInjector);
       
       break;
     
     case "styles":
-      runSequence('assembleStyles','juiceEmail');
+      runSequence('assembleStyles','juiceEmail',htmlInjector);
       
       break;
    
     case "both":
-      runSequence('assembleEmail','assembleStyles','juiceEmail');
+      runSequence('assembleEmail','assembleStyles','juiceEmail',htmlInjector);
       
       break;
   }
 };
+
+function processImages(dir) {
+  gulp.task('images', function() {
+    return gulp.src([path.join(paths.emails, dir, '/images/**/*.{jpeg,jpg,gif,png}'),path.join(paths.shared, '/images/**/*.{jpeg,jpg,gif,png}')])
+      .pipe(imagemin({
+        progressive: true,
+        interlaced: true,
+        svgoPlugins: [{removeUnknownsAndDefaults: false}, {cleanupIDs: false}]
+      }))
+      .pipe(rename({
+        dirname: dir + '/images'
+      }))
+      .pipe(gulp.dest(paths.dist))
+      .pipe(browserSync.stream()); 
+  }); 
+  
+  runSequence('images');
+}
 
 // ### Get folders for iteration
 function getFolders(dir) {
@@ -182,10 +193,10 @@ function getCurrentFolder(filePath,type) {
 function assembleFolder(dir) {
   //Update Assemble App Sources
   assmbleApps[dir] = assemble();
-  assmbleApps[dir].partials([path.join(emailsPath, dir, '/templates/partials/**/*.hbs'),'./src/shared/templates/partials/**/*.hbs']);
-  assmbleApps[dir].layouts([path.join(emailsPath, dir, '/templates/layouts/**/*.hbs'),'./src/shared/templates/layouts/**/*.hbs']);
-  assmbleApps[dir].pages(path.join(emailsPath, dir, '/templates/pages/**/*.hbs'));
-  assmbleApps[dir].data([path.join(emailsPath, dir, '/data/**/*.{json,yml}'),'./src/shared/data/**/*.{json,yml}']);
+  assmbleApps[dir].partials([path.join(paths.emails, dir, '/templates/partials/**/*.hbs'),path.join(paths.shared, '/templates/partials/**/*.hbs')]);
+  assmbleApps[dir].layouts([path.join(paths.emails, dir, '/templates/layouts/**/*.hbs'),path.join(paths.shared, '/templates/layouts/**/*.hbs')]);
+  assmbleApps[dir].pages(path.join(paths.emails, dir, '/templates/email/**/*.hbs'));
+  assmbleApps[dir].data([path.join(paths.emails, dir, '/data/**/*.{json,yml}'),path.join(paths.shared, '/data/**/*.{json,yml}')]);
   assmbleApps[dir].option('layout', 'base');
 };
 
@@ -212,30 +223,25 @@ gulp.task('clean', require('del').bind(null, [paths.dist]));
 // See: http://www.browsersync.io
 gulp.task('serve', function() {
   // register the plugin
-  browserSync.use(htmlInjector, {
-    // Files to watch that will trigger the injection
-    files: "dist/*.html, preview/*.html" 
-  });
   browserSync.init({
     port: 8080,
     server: "./",
-    codeSync: false,
-    startPath: "/preview"
+    startPath: "/preview",
+    codeSync: false
   });
   //Init Apps
-  var folders = getFolders(emailsPath);
+  var folders = getFolders(paths.emails);
   var tasks = folders.map(function(folder) {
     assmbleApps[folder] = assemble();
     assembleFolder(folder);
   });
   
-  //gulp.watch([paths.source + 'styles/**/*'], ['styles']);
-  //gulp.watch([paths.source + 'scripts/**/*'], ['jshint', 'scripts']);
-  //gulp.watch([paths.source + 'fonts/**/*'], ['fonts']);
-  //gulp.watch([paths.source + 'images/**/*'], ['images']);
-  
-  gulp.watch('dist/**/*.html', htmlInjector);
-  gulp.watch(['bower.json', paths.source + 'assets/manifest.json'], ['build']);
+  //Styles Folder Watch
+  gulp.watch('src/emails/**/images/**/*.{jpeg,jpg,gif,png}').on('change', function (file) {
+    var currentFolder = getCurrentFolder(file.path,'emails');
+    
+    processImages(currentFolder);   
+  });
   
   //Styles Folder Watch
   gulp.watch('src/emails/**/styles/**/*.{scss,less}').on('change', function (file) {
@@ -247,22 +253,15 @@ gulp.task('serve', function() {
   //Email Folder Watch
   gulp.watch('src/emails/**/*.{hbs,json,yml}', htmlInjector).on('change', function (file) {
     var currentFolder = getCurrentFolder(file.path,'emails');
-    var timeName = '';
     
     switch (file.type) {
       case "added":
-        var timeName = 'Email '+currentFolder+' -html added';
-        console.time(timeName);
-        
         assembleFolder(currentFolder);
         assembleOutput(currentFolder);
         
         break;
         
       case "renamed":
-        var timeName = 'Email:'+currentFolder+' -html renamed';
-        console.time(timeName);
-        
         //Remove old
         var oldPathArray = file.old.split(path.sep);
         var oldFilename = oldPathArray[oldPathArray.length-1];
@@ -280,9 +279,6 @@ gulp.task('serve', function() {
         break;
         
       case "deleted":
-        var timeName = 'Email:'+currentFolder+' -html deleted';
-        console.time(timeName);
-        
         var pathArray = file.path.split(path.sep);
         var filename = pathArray[pathArray.length-1];
         filename = filename.substr(0, filename.lastIndexOf('.'));
@@ -298,20 +294,16 @@ gulp.task('serve', function() {
         break;
         
       case "changed":
-        var timeName = 'Email:'+currentFolder+' -html changed';
-        console.time(timeName);
-        
         assembleFolder(currentFolder);
         assembleOutput(currentFolder);
       
         break;
     }
-    console.timeEnd(timeName);
   });
   
   //Shared Email Folder Watch
-  gulp.watch('src/shared/**/*.{hbs,json,yml}').on('change', function (file) {
-    var folders = getFolders(emailsPath);
+  gulp.watch(path.join(paths.shared, '/**/*.{hbs,json,yml}')).on('change', function (file) {
+    var folders = getFolders(paths.emails);
     
     var timeName = 'Shared Email -html changed';
     console.time(timeName);

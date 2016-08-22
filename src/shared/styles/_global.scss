@@ -1,0 +1,75 @@
+/* -------------------------------------
+    GLOBAL RESETS
+------------------------------------- */
+table,
+td,
+div,
+a {
+  box-sizing: border-box;
+}
+
+img {
+	-ms-interpolation-mode: bicubic;
+	max-width: 100%;
+	border:0 none;
+	line-height:100%;
+	outline:none;
+	text-decoration:none;
+
+	&.heightFix {
+		height:auto;
+	}
+}
+
+a img{
+    border:0 none;
+}
+
+.imageFix{
+    display:block;
+}
+
+body {
+	font-family: $body-font-family;
+	-webkit-font-smoothing: antialiased;
+	font-size: $body-font-size;
+	height: 100% !important;
+	line-height: $body-line-height;
+	margin: 0;
+	padding: 0;
+	-ms-text-size-adjust: 100%;
+	-webkit-text-size-adjust: 100%;
+	width: 100% !important;
+}
+
+center {
+  text-align: center;
+  margin: 0 auto;
+}
+
+// Let's make sure all tables have defaults
+table {
+	border-collapse:collapse;
+	mso-table-lspace: 0pt;
+	mso-table-rspace: 0pt;
+	width: 100%;
+
+	td {
+		border-collapse:collapse;
+		vertical-align: top;
+	}
+}
+
+// External class fix for Outlook.com
+.ExternalClass {
+	width: 100%;
+}
+
+.ExternalClass,
+.ExternalClass p,
+.ExternalClass span,
+.ExternalClass font,
+.ExternalClass td,
+.ExternalClass div {
+	line-height: 100%;
+}

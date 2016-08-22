@@ -1,0 +1,45 @@
+/* -------------------------------------
+    CONFIGURE YOUR VARIABLES
+------------------------------------- */
+
+$padding:                   30px !default;  // For consistent padding
+$columnPadding:             30px !default;  // Padding used for wrappers and between content
+$resPadding:                40px !default;  // Responsive boudary padding
+$width:                     580px !default; // Width of the content area
+$br:                        3px !default;   // Border radius
+$btn-br:                    5px !default;   // Button border radius
+
+// Colours
+// -------
+$colour-primary:            #348eda !default;	// Primary color for buttons and links
+$colour-font: 				      #111111 !default;	// Default font color
+$colour-background:         #f1efef !default; // Background color
+
+$colour-grey:               $colour-background;
+
+// Typography
+// -------
+$body-font-family:          "Helvetica Neue", "Helvetica", Helvetica, Arial, sans-serif !default;
+$body-font-weight:          400 !default;
+$body-font-size:            14px !default;
+$body-font-color:           #555555 !default;
+$body-line-height:          22px !default;
+
+// Notices
+// -------
+$notice-color-info:         #3d88ce !default;
+$notice-color-success:      #81ad22 !default;
+$notice-color-warning:      #c6a121 !default;
+$notice-color-danger:       #be2c2c !default;
+
+$notice-border-radius:      6px !default;
+$notice-font-size:          $body-font-size !default;
+$notice-font-weight:        $body-font-weight !default;
+$notice-line-height:        $body-line-height !default;
+$notice-padding:            8px 12px !default;
+$notice-margin:             10px 0 !default;
+
+// Dividers
+// --------
+$divider-margin:            20px 0 !default;
+$divider-color:             #cccccc !default;

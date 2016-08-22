@@ -1,0 +1,98 @@
+/* -------------------------------------
+    BODY & CONTAINER
+------------------------------------- */
+
+body {
+  background-color: $colour-background;
+}
+
+.body {
+  background-color: $colour-background;
+  width: 100%;
+}
+
+/* Set a max-width, and make it display as block so it will automatically stretch to that width, but will also shrink down on a phone or something */
+.container {
+	display: block;
+	margin: 0 auto !important; /* makes it centered */
+	padding: 0;
+	max-width: $width;
+	width: 100%;
+}
+
+.inner-container {
+  width: $width;
+	padding: 0;
+	text-align: center;
+  > tr {
+    > td {
+      width: $width;
+    	padding: 0;
+    	text-align: center;
+    }
+  }
+}
+
+.row {
+  width: 100%;
+  padding: 0;
+}
+
+/* This should also be a block element, so that it will fill 100% of the .container */
+.content {
+  display: block;
+  margin: 0 auto;
+  padding: 0;
+	width: 100%;
+  max-width: $width;
+  font-size: 0;
+  line-height: 0;
+}
+
+.spacer {
+	mso-line-height-rule:exactly;
+	padding: 0;
+
+	&-image {
+		font-size: 1px;
+		line-height: 1px;
+  	padding: 0;
+
+		img {
+			display: block;
+		}
+	}
+}
+
+.td {
+  display: inline-block;
+  font-size: 0;
+  line-height: 0;
+}
+
+/* -------------------------------------
+    GRIDDING
+------------------------------------- */
+.wrapper {
+  padding: 0 round($columnPadding / 2);
+
+  &-single {
+    padding: 0 $columnPadding;
+  }
+}
+
+.column {
+  padding: 0 round($columnPadding / 2);
+
+  &-single {
+    padding: 0 $columnPadding;
+  }
+}
+
+// Responsive column component
+.col {
+  display: inline-block;
+  width: 100%;
+  font-size: 0;
+  line-height: 0;
+}
