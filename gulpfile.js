@@ -25,6 +25,7 @@ var runSequence  = require('run-sequence');
 var sass         = require('gulp-sass');
 var sourcemaps   = require('gulp-sourcemaps');
 var rename       = require('gulp-rename');
+var debug        = require('gulp-debug');
 
 var assemble     = require('assemble');
 var extname      = require('gulp-extname');
@@ -111,7 +112,8 @@ var cssTasks = lazypipe()
 //   .pipe(cssTasks('main.css')
 //   .pipe(gulp.dest(paths.dist + 'styles'))
 // ```
-function assembleOutput(dir) {
+function assembleOutput(dir, type) {
+  type = type || 'email';
   
   gulp.task('assembleEmail', function() {
     return assmbleApps[dir].toStream('pages')
@@ -124,6 +126,15 @@ function assembleOutput(dir) {
       .pipe(assmbleApps[dir].dest(paths.assemble));
   });
   
+  gulp.task('assembleStyles', function() {  
+    return gulp.src(path.join(emailsPath, dir, '/styles/**/*.{scss,less}'))
+      .pipe(cssTasks)      
+      .pipe(rename({
+        dirname: dir + '/styles'
+      }))
+      .pipe(gulp.dest(paths.assemble));
+  });
+  
   gulp.task('juiceEmail', function() {  
     return gulp.src(path.join(paths.assemble, dir, '/**/*.html'))
       .pipe(juice(juiceOptions))
@@ -133,9 +144,23 @@ function assembleOutput(dir) {
       .pipe(gulp.dest(paths.dist));
   });
   
-  runSequence('assembleEmail','juiceEmail');
+  switch (type) {
+    case "email":
+      runSequence('assembleEmail','juiceEmail');
+      
+      break;
+    
+    case "styles":
+      runSequence('assembleStyles','juiceEmail');
+      
+      break;
+   
+    case "both":
+      runSequence('assembleEmail','assembleStyles','juiceEmail');
+      
+      break;
+  }
 };
-
 
 // ### Get folders for iteration
 function getFolders(dir) {
@@ -215,16 +240,8 @@ gulp.task('serve', function() {
   //Styles Folder Watch
   gulp.watch('src/emails/**/styles/**/*.{scss,less}').on('change', function (file) {
     var currentFolder = getCurrentFolder(file.path,'emails');
-    var stylePath = path.join(emailsPath, currentFolder, '/styles/**/*.scss');
-    
-    gulp.src(stylePath)
-      .pipe(cssTasks)      
-      .pipe(rename({
-        dirname: currentFolder + '/styles'
-      }))
-      .pipe(gulp.dest(paths.dist));
       
-    assembleOutput(currentFolder);
+    assembleOutput(currentFolder,'styles');
   });
   
   //Email Folder Watch
