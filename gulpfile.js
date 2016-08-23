@@ -82,7 +82,8 @@ var enabled = {
 function assembleOutput(dir, type) {
   type = type || 'email';
   
-  gulp.task('assembleEmail', function() {
+  //Assemble Emails
+  gulp.task('assembleEmail--'+dir, function() {
     return assmbleApps[dir].toStream('pages')
       .pipe(debug({title: 'Assemble Email:'}))
       .pipe(assmbleApps[dir].renderFile())
@@ -94,7 +95,8 @@ function assembleOutput(dir, type) {
       .pipe(assmbleApps[dir].dest(paths.assemble));
   });
   
-  gulp.task('assembleStyles', function() {  
+  //Assemble Stylesheets
+  gulp.task('assembleStyles--'+dir, function() {  
     return gulp.src(path.join(paths.emails, dir, '/styles/**/*.scss'))
       .pipe(debug({title: 'Assemble Sass:'}))
       .pipe(sass({
@@ -116,7 +118,8 @@ function assembleOutput(dir, type) {
       .pipe(gulp.dest(paths.assemble));
   });
   
-  gulp.task('juiceEmail', function() {  
+  //Juice HTML and Styles
+  gulp.task('juiceEmail--'+dir, function() {  
     return gulp.src(path.join(paths.assemble, dir, '/**/*.html'))
       .pipe(debug({title: 'Juice Email:'}))
       .pipe(juice(juiceOptions))
@@ -124,11 +127,14 @@ function assembleOutput(dir, type) {
       .pipe(replace('[mso_open]', '<!--[if (gte mso 9)|(IE)]>'))
       .pipe(replace('[mso_close]', '<![endif]-->'))
       
-      .pipe(replace('[mso_open]', '<!--[if gte mso 11]>'))
-      .pipe(replace('[mso_close]', '<![endif]-->'))
+      .pipe(replace('[mso_11_open]', '<!--[if gte mso 11]>'))
+      .pipe(replace('[mso_11_close]', '<![endif]-->'))
       
-      .pipe(replace('[mso_open]', '<!--[if !gte mso 11]><!---->'))
-      .pipe(replace('[mso_close]', '<!--<![endif]-->'))
+      .pipe(replace('[mso_bg_open]', '<!--[if gte mso 11]>'))
+      .pipe(replace('[mso_bg_close]', '<![endif]-->'))
+      
+      .pipe(replace('[not_mso_open]', '<!--[if !gte mso 11]><!---->'))
+      .pipe(replace('[not_mso_close]', '<!--<![endif]-->'))
       
       .pipe(rename({
         dirname: dir
@@ -136,28 +142,31 @@ function assembleOutput(dir, type) {
       .pipe(gulp.dest(paths.dist));
   });
 
-  
+  //Assemble Switch
+  //accepts 'email', 'styles' or 'both'
   switch (type) {
     case "email":
-      runSequence('assembleEmail','juiceEmail',htmlInjector);
+      runSequence('assembleEmail--'+dir,'juiceEmail--'+dir,htmlInjector);
       
       break;
     
     case "styles":
-      runSequence('assembleStyles','juiceEmail',htmlInjector);
+      runSequence('assembleStyles--'+dir,'juiceEmail--'+dir,htmlInjector);
       
       break;
    
     case "both":
-      runSequence('assembleEmail','assembleStyles','juiceEmail',htmlInjector);
+      runSequence('assembleEmail--'+dir,'assembleStyles--'+dir,'juiceEmail--'+dir,htmlInjector);
       
       break;
   }
 };
 
-function processImages(dir) {
+function processImages(dir,file) {
+  file = file || '';
+  
   gulp.task('images', function() {
-    return gulp.src([path.join(paths.emails, dir, '/images/**/*.{jpeg,jpg,gif,png}'),path.join(paths.shared, '/images/**/*.{jpeg,jpg,gif,png}')])
+    return gulp.src(file == '' ? [path.join(paths.emails, dir, '/images/**/*.{jpeg,jpg,gif,png}'),path.join(paths.shared, '/images/**/*.{jpeg,jpg,gif,png}')] : file)
       .pipe(imagemin({
         progressive: true,
         interlaced: true,
@@ -168,9 +177,9 @@ function processImages(dir) {
       }))
       .pipe(gulp.dest(paths.dist))
       .pipe(browserSync.stream()); 
-  }); 
+  });
   
-  runSequence('images');
+  gulp.start('images');
 }
 
 // ### Get folders for iteration
@@ -200,26 +209,13 @@ function assembleFolder(dir) {
   assmbleApps[dir].option('layout', 'base');
 };
 
-// ## Gulp tasks
-// Run `gulp -T` for a task summary
-
-// ### Styles
-// `gulp styles` - Compiles, combines, and optimizes Bower CSS and project CSS.
-// By default this task will only log a warning if a precompiler error is
-// raised. If the `--production` flag is set: this task will fail outright.
-
-// ### Images
-// `gulp images` - Run lossless compression on all the images.
-
 // ### Clean
-// `gulp clean` - Deletes the build folder entirely.
-gulp.task('clean', require('del').bind(null, [paths.dist]));
+// `gulp clean` - Deletes the dist and assemble folder entirely.
+gulp.task('clean', require('del').bind(null, [paths.dist,paths.assemble]));
 
 // ### Serve
 // `gulp serve` - Use BrowserSync to proxy your dev server and synchronize code
-// changes across devices. Specify the hostname of your dev server at
-// `manifest.config.devUrl`. When a modification is made to an asset, run the
-// build step for that asset and inject the changes into the page.
+// changes across devices.
 // See: http://www.browsersync.io
 gulp.task('serve', function() {
   // register the plugin
@@ -229,52 +225,66 @@ gulp.task('serve', function() {
     startPath: "/preview",
     codeSync: false
   });
-  //Init Apps
+  
   var folders = getFolders(paths.emails);
   var tasks = folders.map(function(folder) {
     assmbleApps[folder] = assemble();
     assembleFolder(folder);
   });
   
-  //Styles Folder Watch
-  gulp.watch('src/emails/**/images/**/*.{jpeg,jpg,gif,png}').on('change', function (file) {
-    var currentFolder = getCurrentFolder(file.path,'emails');
-    
-    processImages(currentFolder);   
-  });
-  
-  //Styles Folder Watch
-  gulp.watch('src/emails/**/styles/**/*.{scss,less}').on('change', function (file) {
-    var currentFolder = getCurrentFolder(file.path,'emails');
-      
-    assembleOutput(currentFolder,'styles');
-  });
-  
-  //Email Folder Watch
-  gulp.watch('src/emails/**/*.{hbs,json,yml}', htmlInjector).on('change', function (file) {
+  //Images Folder Watch
+  gulp.watch(path.join(paths.emails, '/**/images/**/*.{jpeg,jpg,gif,png}')).on('change', function (file) {
     var currentFolder = getCurrentFolder(file.path,'emails');
     
     switch (file.type) {
-      case "added":
-        assembleFolder(currentFolder);
-        assembleOutput(currentFolder);
+      case "renamed":
+        //Remove old
+        var filePath = path.parse(file.old);
         
+        var oldFilePath = path.join(currentFolder , "/images", filePath.name + filePath.ext);
+        var oldDestFilePath = path.resolve(paths.dist, oldFilePath);
+        
+        del(oldDestFilePath);
+      
         break;
         
+      case "deleted":
+        var filePath = path.parse(file.path);
+        
+        var filePath = path.join(currentFolder , "/images", filePath.name + filePath.ext);
+        var destFilePath = path.resolve(paths.dist, filePath);
+        
+        del(destFilePath);
+      
+        break;
+    }
+    processImages(currentFolder,file.path);
+  
+  });
+  
+  //Styles Folder Watch
+  gulp.watch(path.join(paths.emails, '/**/styles/**/*.{scss,less}')).on('change', function (file) {
+    var currentFolder = getCurrentFolder(file.path,'emails');
+      
+    assembleOutput(currentFolder,'styles');
+    
+  });
+  
+  //Email Folder Watch
+  gulp.watch(path.join(paths.emails, '/**/*.{hbs,json,yml}')).on('change', function (file) {
+    var currentFolder = getCurrentFolder(file.path,'emails');
+    
+    switch (file.type) {
       case "renamed":
         //Remove old
         var oldPathArray = file.old.split(path.sep);
         var oldFilename = oldPathArray[oldPathArray.length-1];
         oldFilename = oldFilename.substr(0, oldFilename.lastIndexOf('.'));
         
-        var oldFilePath = currentFolder + path.sep + oldFilename + ".html";
+        var oldFilePath = path.join(currentFolder, oldFilename + ".html");
         var oldDestFilePath = path.resolve(paths.dist, oldFilePath);
         
         del(oldDestFilePath);
-        
-        //Add new
-        assembleFolder(currentFolder);
-        assembleOutput(currentFolder);
       
         break;
         
@@ -283,37 +293,58 @@ gulp.task('serve', function() {
         var filename = pathArray[pathArray.length-1];
         filename = filename.substr(0, filename.lastIndexOf('.'));
         
-        var filePath = currentFolder + path.sep + filename + ".html";
+        var filePath = path.join(currentFolder, filename + ".html");
         var destFilePath = path.resolve(paths.dist, filePath);
         
         del(destFilePath);
+      
+        break;
+    }    
+    assembleFolder(currentFolder);
+    assembleOutput(currentFolder);
+    
+  });
+  
+  //Shared Image Folder Watch
+  gulp.watch(path.join(paths.shared, '/images/**/*.{jpeg,jpg,gif,png}')).on('change', function (file) {
+    var folders = getFolders(paths.emails);
+    
+    var tasks = folders.map(function(currentFolder) {
+      switch (file.type) {
+      case "renamed":
+        //Remove old
+        var filePath = path.parse(file.old);
         
-        assembleFolder(currentFolder);
-        assembleOutput(currentFolder);
+        var oldFilePath = path.join(currentFolder , "/images", filePath.name + filePath.ext);
+        var oldDestFilePath = path.resolve(paths.dist, oldFilePath);
+        
+        del(oldDestFilePath);
       
         break;
         
-      case "changed":
-        assembleFolder(currentFolder);
-        assembleOutput(currentFolder);
+      case "deleted":
+        var filePath = path.parse(file.path);
+        
+        var filePath = path.join(currentFolder , "/images", filePath.name + filePath.ext);
+        var destFilePath = path.resolve(paths.dist, filePath);
+        
+        del(destFilePath);
       
         break;
-    }
+      }
+      processImages(currentFolder);
+      
+    });
   });
   
   //Shared Email Folder Watch
   gulp.watch(path.join(paths.shared, '/**/*.{hbs,json,yml}')).on('change', function (file) {
     var folders = getFolders(paths.emails);
     
-    var timeName = 'Shared Email -html changed';
-    console.time(timeName);
-    
     var tasks = folders.map(function(currentFolder) {
       assembleFolder(currentFolder);
-      assembleOutput(currentFolder);
+      assembleOutput(currentFolder,'both');
     });
-    
-    console.timeEnd(timeName);
   });
   
 });
@@ -322,11 +353,15 @@ gulp.task('serve', function() {
 // `gulp build` - Run all the build tasks but don't clean up beforehand.
 // Generally you should be running `gulp` instead of `gulp build`.
 gulp.task('build', function(callback) {
-  runSequence('styles',
-              'scripts',
-              ['fonts', 'images'],
-              'assemble',
-              callback);
+  var folders = getFolders(paths.emails);
+
+  var tasks = folders.map(function(currentFolder) {
+    processImages(currentFolder);
+    assembleFolder(currentFolder);
+    assembleOutput(currentFolder,'both');
+  });
+  callback;
+  
 });
 
 // ### Gulp
