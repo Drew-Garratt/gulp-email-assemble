@@ -38,6 +38,9 @@ browserSync.use(htmlInjector)
 
 var assmbleApps = [];
 
+var s3Config = JSON.parse(fs.readFileSync('aws.json'));
+var s3       = require('gulp-s3-upload')(s3Config);
+
 var paths = {
   src: './src',
   assemble: './assemble',
@@ -349,6 +352,26 @@ gulp.task('serve', function() {
   
 });
 
+gulp.task('s3upload', function(callback) {
+  
+  var folders = getFolders(paths.emails);
+
+  var tasks = folders.map(function(dir) {
+    gulp.src([path.join(paths.emails, dir, '/images/**/*.{jpeg,jpg,gif,png}'),path.join(paths.shared, '/images/**/*.{jpeg,jpg,gif,png}')])
+      .pipe(s3({
+          Bucket: 'tribeuk',
+          ACL: 'public-read',
+          keyTransform: function(relative_filename) {
+              var new_name = 'mail_images/' + dir + '/' + relative_filename;
+              return new_name;
+          }
+      }))
+    ;
+  });
+  
+  callback;
+});
+
 // ### Build
 // `gulp build` - Run all the build tasks but don't clean up beforehand.
 // Generally you should be running `gulp` instead of `gulp build`.
@@ -360,8 +383,8 @@ gulp.task('build', function(callback) {
     assembleFolder(currentFolder);
     assembleOutput(currentFolder,'both');
   });
-  callback;
   
+  callback;
 });
 
 // ### Gulp
