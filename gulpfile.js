@@ -25,6 +25,7 @@ var sourcemaps   = require('gulp-sourcemaps');
 var rename       = require('gulp-rename');
 var replace      = require('gulp-replace');
 var debug        = require('gulp-debug');
+var toJson       = require('gulp-to-json');
 
 var assemble     = require('assemble');
 var extname      = require('gulp-extname');
@@ -44,6 +45,7 @@ var s3       = require('gulp-s3-upload')(s3Config);
 var paths = {
   src: './src',
   assemble: './assemble',
+  preview: './preview',
   dist: './dist',
   emails: './src/emails',
   shared: './src/shared'
@@ -169,7 +171,7 @@ function processImages(dir,file) {
   file = file || '';
   
   gulp.task('images', function() {
-    return gulp.src(file == '' ? [path.join(paths.emails, dir, '/images/**/*.{jpeg,jpg,gif,png}'),path.join(paths.shared, '/images/**/*.{jpeg,jpg,gif,png}')] : file)
+    return gulp.src(file == '' ? [path.join(paths.shared, '/images/**/*.{jpeg,jpg,gif,png}'),path.join(paths.emails, dir, '/images/**/*.{jpeg,jpg,gif,png}')] : file)
       .pipe(imagemin({
         progressive: true,
         interlaced: true,
@@ -352,12 +354,11 @@ gulp.task('serve', function() {
   
 });
 
-gulp.task('s3upload', function(callback) {
-  
+gulp.task('s3upload', function(callback) {  
   var folders = getFolders(paths.emails);
 
   var tasks = folders.map(function(dir) {
-    gulp.src([path.join(paths.emails, dir, '/images/**/*.{jpeg,jpg,gif,png}'),path.join(paths.shared, '/images/**/*.{jpeg,jpg,gif,png}')])
+    gulp.src([path.join(paths.shared, '/images/**/*.{jpeg,jpg,gif,png}'),path.join(paths.emails, dir, '/images/**/*.{jpeg,jpg,gif,png}')])
       .pipe(s3({
           Bucket: 'tribeuk',
           ACL: 'public-read',
@@ -365,8 +366,14 @@ gulp.task('s3upload', function(callback) {
               var new_name = 'mail_images/' + dir + '/' + relative_filename;
               return new_name;
           }
-      }))
-    ;
+      }));
+      
+    gulp.src(path.join(paths.dist, dir, '/**/*.html'))
+      .pipe(debug({title: 'S3 Replace:'}))
+      
+      .pipe(replace(/images\/(\S+\.)(png|jpe?g|gif)/ig, 'https://s3-eu-west-1.amazonaws.com/tribeuk/mail_images/'+dir+'/$1$2'))
+      
+      .pipe(gulp.dest(path.join(paths.dist, dir))); 
   });
   
   callback;
@@ -385,6 +392,14 @@ gulp.task('build', function(callback) {
   });
   
   callback;
+});
+
+gulp.task('emailsJson', function(callback) {
+  gulp.src(path.join(paths.dist,'/**/*.html'))
+  .pipe(toJson({
+    relative: true,
+    filename: path.join(paths.preview,'emails.json')
+  }));
 });
 
 // ### Gulp

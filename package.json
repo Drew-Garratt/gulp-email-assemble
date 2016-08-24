@@ -47,6 +47,7 @@
     "gulp-s3-upload": "^1.6.1",
     "gulp-sass": "^2.0.1",
     "gulp-sourcemaps": "^1.5.2",
+    "gulp-to-json": "^1.0.1",
     "handlebars": "^4.0.5",
     "handlebars-helpers": "^0.7.3",
     "imagemin-pngcrush": "^5.0.0",
