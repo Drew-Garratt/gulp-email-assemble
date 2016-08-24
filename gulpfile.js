@@ -7,8 +7,8 @@ var colors       = require('colors');
 var argv         = require('minimist')(process.argv.slice(2));
 var autoprefixer = require('gulp-autoprefixer');
 var changed      = require('gulp-changed');
-var concat       = require('gulp-concat');
-var flatten      = require('gulp-flatten');
+//var concat       = require('gulp-concat');
+//var flatten      = require('gulp-flatten');
 var gulp         = require('gulp');
 var gulpif       = require('gulp-if');
 var imagemin     = require('gulp-imagemin');
@@ -106,11 +106,12 @@ function assembleOutput(dir, type) {
   gulp.task('assembleStyles--'+dir, function() {  
     return gulp.src(path.join(paths.emails, dir, '/styles/**/*.scss'))
       .pipe(debug({title: 'Assemble Sass:'}))
+      .pipe(sourcemaps.init())
       .pipe(sass({
           outputStyle: 'nested', // libsass doesn't support expanded yet
           precision: 10,
           includePaths: path.join(paths.shared, '/styles')
-        })
+        }).on('error', sass.logError)
       )
       .pipe(autoprefixer({
         browsers: [
@@ -119,6 +120,7 @@ function assembleOutput(dir, type) {
           'opera 12'
         ]})
       )     
+      .pipe(sourcemaps.write())
       .pipe(rename({
         dirname: dir + '/styles'
       }))
