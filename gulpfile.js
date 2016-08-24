@@ -28,6 +28,8 @@ var debug        = require('gulp-debug');
 var toJson       = require('gulp-to-json');
 
 var assemble     = require('assemble');
+var helpers      = require('handlebars-helpers')();
+var yaml         = require('js-yaml');
 var extname      = require('gulp-extname');
 var htmlmin      = require('gulp-htmlmin');
 var juice        = require('gulp-juice-concat-enhanced');
@@ -207,10 +209,13 @@ function getCurrentFolder(filePath,type) {
 function assembleFolder(dir) {
   //Update Assemble App Sources
   assmbleApps[dir] = assemble();
-  assmbleApps[dir].partials([path.join(paths.emails, dir, '/templates/partials/**/*.hbs'),path.join(paths.shared, '/templates/partials/**/*.hbs')]);
-  assmbleApps[dir].layouts([path.join(paths.emails, dir, '/templates/layouts/**/*.hbs'),path.join(paths.shared, '/templates/layouts/**/*.hbs')]);
+  assmbleApps[dir].dataLoader('yml', function(str, fp) {
+    return yaml.safeLoad(str);
+  });
+  assmbleApps[dir].partials([path.join(paths.shared, '/templates/partials/**/*.hbs'),path.join(paths.emails, dir, '/templates/partials/**/*.hbs')]);
+  assmbleApps[dir].layouts([path.join(paths.shared, '/templates/layouts/**/*.hbs'),path.join(paths.emails, dir, '/templates/layouts/**/*.hbs')]);
   assmbleApps[dir].pages(path.join(paths.emails, dir, '/templates/email/**/*.hbs'));
-  assmbleApps[dir].data([path.join(paths.emails, dir, '/data/**/*.{json,yml}'),path.join(paths.shared, '/data/**/*.{json,yml}')]);
+  assmbleApps[dir].data([path.join(paths.shared, '/data/**/*.{json,yml}'),path.join(paths.emails, dir, '/data/**/*.{json,yml}')]);
   assmbleApps[dir].option('layout', 'base');
 };
 
