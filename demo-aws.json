@@ -1,0 +1,6 @@
+{
+  "accessKeyId": "xxxx",
+  "secretAccessKey": "xxxx",
+  "bucket": "xxxx",
+  "baseUrl": "https://xxxx.amazonaws.com"
+}

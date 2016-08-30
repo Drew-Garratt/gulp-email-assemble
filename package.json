@@ -1,6 +1,6 @@
 {
-  "name": "dev.gulp-email-workflow",
-  "version": "0.0.3",
+  "name": "gulp-email-assemble",
+  "version": "0.1.0",
   "author": "Drew Linzmaier-Garratt <drew@cunning.as>",
   "licenses": [
     {
@@ -9,8 +9,7 @@
     }
   ],
   "scripts": {
-    "build": "bower install && gulp",
-    "jshint": "gulp jshint",
+    "build": "gulp",
     "jscs": "jscs gulpfile.js assets/scripts/*.js"
   },
   "engines": {
