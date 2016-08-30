@@ -23,14 +23,6 @@
 
   });
 
-  // Preload selected template from hashed template:
-  if (h && h.indexOf('template:') != -1) {
-    var tpl = h.split(':')[1];
-
-    $templateSelect.val(tpl).trigger('change');
-
-  }
-
   // Mobile Preview Drawer
   function mobilePreviewDrawer() {
     var $toggleBtns = $('.js-drawer-toggle'),
@@ -86,6 +78,16 @@
       });
      
       $templateSelect.append(items);
+      
+      // Preload selected template from hashed template:
+      if (h && h.indexOf('template:') != -1) {
+        var tpl = h.split(':')[1];
+        
+        console.log(tpl);
+    
+        $templateSelect.val(tpl).trigger('change');
+    
+      }
     });
   }
 

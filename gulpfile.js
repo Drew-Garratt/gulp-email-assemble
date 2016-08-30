@@ -59,16 +59,8 @@ var juiceOptions = {
 
 // CLI options
 var enabled = {
-  // Enable static asset revisioning when `--production`
-  rev: argv.production,
-  // Disable source maps when `--production`
-  maps: !argv.production,
-  // Fail styles task on error when `--production`
-  failStyleTask: argv.production,
-  // Fail due to JSHint warnings only when `--production`
-  failJSHint: argv.production,
-  // Strip debug statments from javascript when `--production`
-  stripJSDebug: argv.production
+  // Enable s3upload when `--production`
+  s3: argv.production
 };
 
 
@@ -156,17 +148,17 @@ function assembleOutput(dir, type, min) {
   //accepts 'email', 'styles' or 'both'
   switch (type) {
     case "email":
-      runSequence('assembleEmail--'+dir,'juiceEmail--'+dir,'emailsJson',htmlInjector);
+      runSequence('assembleEmail--'+dir,'juiceEmail--'+dir, 'emailsJson', htmlInjector);
       
       break;
     
     case "styles":
-      runSequence('assembleStyles--'+dir,'juiceEmail--'+dir,htmlInjector);
+      runSequence('assembleStyles--'+dir,'juiceEmail--'+dir, htmlInjector);
       
       break;
    
     case "both":
-      runSequence('assembleEmail--'+dir,'assembleStyles--'+dir,'juiceEmail--'+dir,'emailsJson',htmlInjector);
+      runSequence('assembleEmail--'+dir,'assembleStyles--'+dir,'juiceEmail--'+dir, 'emailsJson', htmlInjector);
       
       break;
   }
@@ -370,7 +362,7 @@ gulp.task('s3upload', function(callback) {
   var tasks = folders.map(function(dir) {
     gulp.src([path.join(paths.shared, '/images/**/*.{jpeg,jpg,gif,png}'),path.join(paths.emails, dir, '/images/**/*.{jpeg,jpg,gif,png}')])
       .pipe(s3({
-          Bucket: 'tribeuk',
+          Bucket: s3Config.bucket,
           ACL: 'public-read',
           keyTransform: function(relative_filename) {
               var new_name = 'mail_images/' + dir + '/' + relative_filename;
@@ -381,7 +373,7 @@ gulp.task('s3upload', function(callback) {
     gulp.src(path.join(paths.dist, dir, '/**/*.html'))
       .pipe(debug({title: 'S3 Replace:'}))
       
-      .pipe(replace(/images\/(\S+\.)(png|jpe?g|gif)/ig, 'https://s3-eu-west-1.amazonaws.com/tribeuk/mail_images/'+dir+'/$1$2'))
+      .pipe(replace(/images\/(\S+\.)(png|jpe?g|gif)/ig, s3Config.baseUrl+'/'+s3Config.bucket+'/mail_images/'+dir+'/$1$2'))
       
       .pipe(gulp.dest(path.join(paths.dist, dir))); 
   });
@@ -434,8 +426,8 @@ gulp.task('build', function(callback) {
 });
 
 // ### Email List to Json
-gulp.task('emailsJson', function(callback) {
-  gulp.src(path.join(paths.dist,'/**/*.html'))
+gulp.task('emailsJson', function() {
+  return gulp.src(path.join(paths.dist,'/**/*.html'))
   .pipe(toJson({
     relative: true,
     filename: path.join(paths.preview,'/scripts/emails.json')
@@ -445,5 +437,9 @@ gulp.task('emailsJson', function(callback) {
 // ### Gulp
 // `gulp` - Run a complete build. To compile for production run `gulp --production`.
 gulp.task('default', ['clean'], function() {
-  gulp.start('previewStyles','build');
+  if(!enabled.s3) {
+    gulp.start('previewStyles','build');
+  } else {
+    gulp.start('previewStyles','build','s3upload');
+  }
 });

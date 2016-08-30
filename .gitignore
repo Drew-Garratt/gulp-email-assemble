@@ -1,3 +1,6 @@
+# Amazon S3 Details
+aws.json
+
 # Node Package Manager
 node_modules
 npm-debug.log
