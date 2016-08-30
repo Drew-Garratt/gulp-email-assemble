@@ -7,18 +7,11 @@ var colors       = require('colors');
 var argv         = require('minimist')(process.argv.slice(2));
 var autoprefixer = require('gulp-autoprefixer');
 var changed      = require('gulp-changed');
-//var concat       = require('gulp-concat');
-//var flatten      = require('gulp-flatten');
 var gulp         = require('gulp');
 var gulpif       = require('gulp-if');
 var imagemin     = require('gulp-imagemin');
-//var jshint       = require('gulp-jshint');
-//var lazypipe     = require('lazypipe');
-//var less         = require('gulp-less');
-//var merge        = require('merge-stream');
 var cssNano      = require('gulp-cssnano');
 var plumber      = require('gulp-plumber');
-//var rev          = require('gulp-rev');
 var runSequence  = require('run-sequence');
 var sass         = require('gulp-sass');
 var sourcemaps   = require('gulp-sourcemaps');
@@ -26,12 +19,12 @@ var rename       = require('gulp-rename');
 var replace      = require('gulp-replace');
 var debug        = require('gulp-debug');
 var toJson       = require('gulp-to-json');
+var htmlmin      = require('gulp-htmlmin');
 
 var assemble     = require('assemble');
 var helpers      = require('handlebars-helpers')();
 var yaml         = require('js-yaml');
 var extname      = require('gulp-extname');
-var htmlmin      = require('gulp-htmlmin');
 var juice        = require('gulp-juice-concat-enhanced');
 
 var browserSync  = require('browser-sync').create();
@@ -79,15 +72,11 @@ var enabled = {
 };
 
 
-// ### CSS processing pipeline
-// Example
-// ```
-// gulp.src(cssFiles)
-//   .pipe(cssTasks('main.css')
-//   .pipe(gulp.dest(paths.dist + 'styles'))
-// ```
-function assembleOutput(dir, type) {
+// ### CSS processing function
+function assembleOutput(dir, type, min) {
   type = type || 'email';
+  min = min || false;
+  
   
   //Assemble Emails
   gulp.task('assembleEmail--'+dir, function() {
@@ -115,9 +104,8 @@ function assembleOutput(dir, type) {
       )
       .pipe(autoprefixer({
         browsers: [
-          'last 2 versions',
-          'android 4',
-          'opera 12'
+          'last 6 versions',
+          'ie 9'
         ]})
       )     
       .pipe(sourcemaps.write())
@@ -128,7 +116,18 @@ function assembleOutput(dir, type) {
   });
   
   //Juice HTML and Styles
-  gulp.task('juiceEmail--'+dir, function() {  
+  gulp.task('juiceEmail--'+dir, function() { 
+
+    //Animation file check
+    var animationCheck = false;
+    var animationCss = false;
+    fs.stat(path.join(paths.assemble, dir, '/styles/animation.scss'), function(err, stat) {
+      if(err == null) {
+        animationCheck = true;
+        animationCss = fs.readFileSync(path.join(paths.assemble, dir, '/styles/animation.scss'), "utf8");
+      }
+    });
+    
     return gulp.src(path.join(paths.assemble, dir, '/**/*.html'))
       .pipe(debug({title: 'Juice Email:'}))
       .pipe(juice(juiceOptions))
@@ -145,6 +144,8 @@ function assembleOutput(dir, type) {
       .pipe(replace('[not_mso_open]', '<!--[if !gte mso 11]><!---->'))
       .pipe(replace('[not_mso_close]', '<!--<![endif]-->'))
       
+      .pipe(gulpif(animationCheck, replace('[animation_css]', animationCss)))
+      
       .pipe(rename({
         dirname: dir
       }))
@@ -155,7 +156,7 @@ function assembleOutput(dir, type) {
   //accepts 'email', 'styles' or 'both'
   switch (type) {
     case "email":
-      runSequence('assembleEmail--'+dir,'juiceEmail--'+dir,htmlInjector);
+      runSequence('assembleEmail--'+dir,'juiceEmail--'+dir,'emailsJson',htmlInjector);
       
       break;
     
@@ -165,12 +166,14 @@ function assembleOutput(dir, type) {
       break;
    
     case "both":
-      runSequence('assembleEmail--'+dir,'assembleStyles--'+dir,'juiceEmail--'+dir,htmlInjector);
+      runSequence('assembleEmail--'+dir,'assembleStyles--'+dir,'juiceEmail--'+dir,'emailsJson',htmlInjector);
       
       break;
   }
 };
 
+
+// ### Image processing function
 function processImages(dir,file) {
   file = file || '';
   
@@ -386,6 +389,35 @@ gulp.task('s3upload', function(callback) {
   callback;
 });
 
+
+// ### Preview Stylesheets
+gulp.task('previewStyles', function() {  
+  return gulp.src(path.join(paths.preview, '/styles/scss/**/*.scss'))
+    .pipe(debug({title: 'Preview Sass:'}))
+    .pipe(sourcemaps.init())
+    .pipe(sass({
+        outputStyle: 'nested', // libsass doesn't support expanded yet
+        precision: 10,
+        includePaths: path.join(paths.shared, '/styles')
+      }).on('error', sass.logError)
+    )
+    .pipe(autoprefixer({
+      browsers: [
+        'last 2 versions',
+        'ie 9',
+        'android 2.3',
+        'android 4',
+        'opera 12'
+      ]})
+    )     
+    .pipe(sourcemaps.write())
+    .pipe(rename({
+      dirname: '/styles'
+    }))
+    .pipe(gulp.dest(paths.preview));
+});
+
+
 // ### Build
 // `gulp build` - Run all the build tasks but don't clean up beforehand.
 // Generally you should be running `gulp` instead of `gulp build`.
@@ -401,16 +433,17 @@ gulp.task('build', function(callback) {
   callback;
 });
 
+// ### Email List to Json
 gulp.task('emailsJson', function(callback) {
   gulp.src(path.join(paths.dist,'/**/*.html'))
   .pipe(toJson({
     relative: true,
-    filename: path.join(paths.preview,'emails.json')
+    filename: path.join(paths.preview,'/scripts/emails.json')
   }));
 });
 
 // ### Gulp
 // `gulp` - Run a complete build. To compile for production run `gulp --production`.
 gulp.task('default', ['clean'], function() {
-  gulp.start('build');
+  gulp.start('previewStyles','build');
 });

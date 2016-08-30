@@ -6,6 +6,11 @@ xmlns:o="urn:schemas-microsoft-com:office:office">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 <title>{{ subject }}</title>
+{{#if animation}}
+<style type="text/css">
+[animation_css]
+</style>
+{{/if}}
 {{#if webfont}}
 <!--[if !mso]><!-- -->
 <link rel="stylesheet" href="styles/{{ webfont }}.css" data-embed>
