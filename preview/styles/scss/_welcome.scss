@@ -32,67 +32,74 @@
     height: 70px;
     position: relative;
   }
-  .animation--stem {
-    position: absolute;
-    left: 50%;
-    top: 35px;
-    width: 2px;
-    height: 50px;
-    margin-left: -1px;
-    background: #348eda;
-
-    &:before {
-      content: "";
-      position: absolute;
-      left: 50%;
-      top: 0;
-      border-radius: 100%;
-      background: #348eda;
-      width: 6px;
-      height: 6px;
-      margin-left: -3px;
-      margin-top: -3px;
-    }
-  }
-  .animation--icon {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    width: 80px;
-    height: 80px;
-    margin-left: -40px;
-    margin-top: -40px;
-    
-    span {
-      background: #348eda;
-      background: rgba(52, 142, 218, 0);
-      border-radius: 100%;
-      display: block;
-      width: 80px;
-      height: 80px;
-      transform: scale(.2);
-      animation-name: wilkomen;
-      animation-duration: 1.8s;
-      animation-iteration-count: infinite;
-      animation-timing-function: linear;
-    }
-    + .animation--icon span {
-      animation-delay: .9s;
-    }
-  }
 }
 
-@keyframes wilkomen {
-  0%   { }
-  25%  { 
-    background: rgba(52, 142, 218, 1); 
-  }
-  50%  { 
-    background: transparent; 
-    box-shadow: inset 0 0 2px rgba(52, 142, 218, 1);
-  }
-  100% { 
-    transform: scale(1,1); 
-    box-shadow: inset 0 0 2px rgba(52, 142, 218, 0);
-  }
+$edge: 4em;
+$n-hex: 6;
+$angle: 360deg/$n-hex;
+$skew-angle: 90deg - $angle;
+$n-per-edge: 3;
+$n-tri: $n-hex*$n-per-edge;
+$h-tri: $edge*cos(.5*$angle);
+$t: 2s;
+$scaling-duration: 80%;
+$pad-duration: 5%;
+$rp: 100% - $scaling-duration - $pad-duration;
+
+.assembly {
+	filter: drop-shadow(0 0 1px currentColor);
+	animation: down $t linear infinite;
+}
+
+@keyframes down { to { transform: scale(.5); } }
+
+.hex {
+	z-index: -1;
+	margin: -$edge;
+	width: 2*$edge; height: 2*$edge;
+	transform: skewY($skew-angle) 
+		scaleX(cos($skew-angle));
+	background: linear-gradient(135deg, 
+		  transparent 25%, currentColor 0, 
+		  currentColor 75%, transparent 0
+	  );
+}
+
+.tri {	
+	&:before {
+		margin: 0 (-.5*$edge);
+		border: solid 0;
+		border-color: currentColor transparent;
+		border-width: $h-tri .5*$edge 0;
+		animation: up $t ease-out infinite;
+		content: '';
+	}
+	
+	@for $i from 0 to $n-hex {
+		@for $j from 0 to $n-per-edge {
+			$idx: $i*$n-per-edge + $j + 1;
+			$f: $j%2;
+			$p: $idx/($n-tri - 1)*$rp + $pad-duration;
+			
+			&:nth-child(#{$idx}) {
+				transform: rotate(-($i - .5)*$angle) 
+					translateY($h-tri) 
+					if($j == 0, (), 
+						translate($j*.5*$edge, $f*$h-tri) 
+						rotate($f*.5turn)
+					);
+					
+				&:before { animation-name: up-#{$idx}; }
+			}
+			
+			@at-root {
+				@keyframes up-#{$idx} {
+					0%, #{$p} { transform: scale(0); }
+					100%, #{$p + $scaling-duration} {
+						transform: scale(1);
+					}
+				}
+			}
+		}
+	}
 }
