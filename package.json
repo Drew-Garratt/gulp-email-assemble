@@ -34,6 +34,7 @@
     "gulp-if": "^2.0.0",
     "gulp-imagemin": "^3.0.2",
     "gulp-juice-concat-enhanced": "^1.2.2",
+    "gulp-litmus": "0.0.7",
     "gulp-minify-html": "^1.0.6",
     "gulp-plumber": "^1.0.1",
     "gulp-rename": "^1.2.2",
