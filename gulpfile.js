@@ -116,35 +116,41 @@ function assembleOutput(dir, type, min) {
     //Animation file check
     var animationCheck = false;
     var animationCss = false;
-    fs.stat(path.join(paths.assemble, dir, '/styles/animation.scss'), function(err, stat) {
+    fs.stat(path.join(paths.assemble, dir, '/styles/animation.css'), function(err, stat) {
       if(err == null) {
         animationCheck = true;
-        animationCss = fs.readFileSync(path.join(paths.assemble, dir, '/styles/animation.scss'), "utf8");
+        animationCss = fs.readFileSync(path.join(paths.assemble, dir, '/styles/animation.css'), "utf8");
+        juiceReplace(animationCheck,animationCss);
+      } else {
+        juiceReplace(animationCheck,animationCss);
       }
     });
 
-    return gulp.src(path.join(paths.assemble, dir, '/**/*.html'))
-      .pipe(debug({title: 'Juice Email:'}))
-      .pipe(juice(juiceOptions))
+    function juiceReplace(animationCheck,animationCss) {
+      return gulp.src(path.join(paths.assemble, dir, '/**/*.html'))
+        .pipe(debug({title: 'Juice Email:'}))
+        .pipe(juice(juiceOptions))
 
-      .pipe(replace('[mso_open]', '<!--[if (gte mso 9)|(IE)]>'))
-      .pipe(replace('[mso_close]', '<![endif]-->'))
+        .pipe(replace('[mso_open]', '<!--[if (gte mso 9)|(IE)]>'))
+        .pipe(replace('[mso_close]', '<![endif]-->'))
 
-      .pipe(replace('[mso_11_open]', '<!--[if gte mso 11]>'))
-      .pipe(replace('[mso_11_close]', '<![endif]-->'))
+        .pipe(replace('[mso_11_open]', '<!--[if gte mso 11]>'))
+        .pipe(replace('[mso_11_close]', '<![endif]-->'))
 
-      .pipe(replace('[mso_bg_open]', '<!--[if gte mso 11]>'))
-      .pipe(replace('[mso_bg_close]', '<![endif]-->'))
+        .pipe(replace('[mso_bg_open]', '<!--[if gte mso 11]>'))
+        .pipe(replace('[mso_bg_close]', '<![endif]-->'))
 
-      .pipe(replace('[not_mso_open]', '<!--[if !gte mso 11]><!---->'))
-      .pipe(replace('[not_mso_close]', '<!--<![endif]-->'))
+        .pipe(replace('[not_mso_open]', '<!--[if !gte mso 11]><!---->'))
+        .pipe(replace('[not_mso_close]', '<!--<![endif]-->'))
 
-      .pipe(gulpif(animationCheck, replace('[animation_css]', animationCss)))
+        .pipe(gulpif(animationCheck, replace('[animation_css]', '<style type="text/css">'+animationCss+'</style>')))
 
-      .pipe(rename({
-        dirname: dir
-      }))
-      .pipe(gulp.dest(paths.dist));
+        .pipe(rename({
+          dirname: dir
+        }))
+        .pipe(gulp.dest(paths.dist));
+    }
+
   });
 
   //Assemble Switch
@@ -236,6 +242,9 @@ gulp.task('serve', function() {
     codeSync: false,
     notify: false
   });
+
+  //Prepare Email List for Serve
+  gulp.start('emailsJson');
 
   var folders = getFolders(paths.emails);
   var tasks = folders.map(function(folder) {

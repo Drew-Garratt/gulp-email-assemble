@@ -1,5 +1,5 @@
 .preview-interface-view {
-  
+
   // Basic elements
   body {
     background: #222;
@@ -39,14 +39,21 @@
   .header--select {
     text-align: right;
   }
+  #template-select {
+    width: 250px;
+  }
+  .select2-container {
+    text-align: left;
+    color: #333;
+  }
 
   // Preview Screens
   .preview-ui--full,
   .preview-ui--mobile,
   .preview-ui--mobile__container {
-    transition: margin all $drawer-animation-duration linear, 
-                padding all $drawer-animation-duration linear, 
-                width all $drawer-animation-duration linear, 
+    transition: margin all $drawer-animation-duration linear,
+                padding all $drawer-animation-duration linear,
+                width all $drawer-animation-duration linear,
                 opaciy all $drawer-animation-duration linear;
   }
 
@@ -95,7 +102,7 @@
     height: 40px;
     z-index: 10;
   }
-  
+
   // Layout elemnts when mobile drawer is hidden
   .mobile-drawer-hidden {
     .preview-ui--full {
@@ -128,7 +135,7 @@
       }
     }
   }
-  
+
   // Drawer close toggle (x)
   .toggle-drawer-close {
     z-index: 1;

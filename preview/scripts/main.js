@@ -5,7 +5,10 @@
     $body = $('body'),
     h = document.location.hash,
     drawerCookieName = 'mobile-drawer-hidden';
-    
+
+  // Initilize Select2
+  $templateSelect.select2();
+
   // Fetch Mail Json
   getEmails();
 
@@ -17,7 +20,7 @@
 
     if (!v)
       return;
-    
+
     $('iframe').attr('src', v + '?t=' + ms);
     document.location.hash = 'template:' + v;
 
@@ -66,7 +69,7 @@
       if (callNow) func.apply(context, args);
     };
   };
-  
+
   //Get email list
   function getEmails() {
     $.getJSON( "scripts/emails.json", function( data ) {
@@ -76,17 +79,15 @@
         var fileName = val.substring(val.lastIndexOf('/') + 1);
         items.push( "<option value='/dist/" + val + "' data-subject='" + fileName + "'>" + val + "</option>" );
       });
-     
+
       $templateSelect.append(items);
-      
+
       // Preload selected template from hashed template:
       if (h && h.indexOf('template:') != -1) {
         var tpl = h.split(':')[1];
-        
-        console.log(tpl);
-    
+
         $templateSelect.val(tpl).trigger('change');
-    
+
       }
     });
   }
