@@ -5,6 +5,5 @@ aws.json
 node_modules
 npm-debug.log
 
-# Bower
-bower_components
-
+# Assemble
+assemble
