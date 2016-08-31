@@ -60,7 +60,8 @@ var juiceOptions = {
 // CLI options
 var enabled = {
   // Enable s3upload when `--production`
-  s3: argv.production
+  s3: argv.production,
+  maps: !argv.production
 };
 
 
@@ -75,7 +76,7 @@ function assembleOutput(dir, type, min) {
     return assmbleApps[dir].toStream('pages')
       .pipe(debug({title: 'Assemble Email:'}))
       .pipe(assmbleApps[dir].renderFile())
-      .pipe(htmlmin())
+      .pipe(htmlmin({collapseWhitespace: true}))
       .pipe(extname())
       .pipe(rename({
         dirname: dir
@@ -100,7 +101,9 @@ function assembleOutput(dir, type, min) {
           'ie 9'
         ]})
       )
-      .pipe(sourcemaps.write())
+      .pipe(gulpif(enabled.maps, sourcemaps.write('.', {
+        sourceRoot: 'assets/styles/'
+      })))
       .pipe(rename({
         dirname: dir + '/styles'
       }))
