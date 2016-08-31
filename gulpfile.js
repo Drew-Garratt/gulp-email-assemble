@@ -68,8 +68,8 @@ var enabled = {
 function assembleOutput(dir, type, min) {
   type = type || 'email';
   min = min || false;
-  
-  
+
+
   //Assemble Emails
   gulp.task('assembleEmail--'+dir, function() {
     return assmbleApps[dir].toStream('pages')
@@ -82,9 +82,9 @@ function assembleOutput(dir, type, min) {
       }))
       .pipe(assmbleApps[dir].dest(paths.assemble));
   });
-  
+
   //Assemble Stylesheets
-  gulp.task('assembleStyles--'+dir, function() {  
+  gulp.task('assembleStyles--'+dir, function() {
     return gulp.src(path.join(paths.emails, dir, '/styles/**/*.scss'))
       .pipe(debug({title: 'Assemble Sass:'}))
       .pipe(sourcemaps.init())
@@ -99,16 +99,16 @@ function assembleOutput(dir, type, min) {
           'last 6 versions',
           'ie 9'
         ]})
-      )     
+      )
       .pipe(sourcemaps.write())
       .pipe(rename({
         dirname: dir + '/styles'
       }))
       .pipe(gulp.dest(paths.assemble));
   });
-  
+
   //Juice HTML and Styles
-  gulp.task('juiceEmail--'+dir, function() { 
+  gulp.task('juiceEmail--'+dir, function() {
 
     //Animation file check
     var animationCheck = false;
@@ -119,25 +119,25 @@ function assembleOutput(dir, type, min) {
         animationCss = fs.readFileSync(path.join(paths.assemble, dir, '/styles/animation.scss'), "utf8");
       }
     });
-    
+
     return gulp.src(path.join(paths.assemble, dir, '/**/*.html'))
       .pipe(debug({title: 'Juice Email:'}))
       .pipe(juice(juiceOptions))
-      
+
       .pipe(replace('[mso_open]', '<!--[if (gte mso 9)|(IE)]>'))
       .pipe(replace('[mso_close]', '<![endif]-->'))
-      
+
       .pipe(replace('[mso_11_open]', '<!--[if gte mso 11]>'))
       .pipe(replace('[mso_11_close]', '<![endif]-->'))
-      
+
       .pipe(replace('[mso_bg_open]', '<!--[if gte mso 11]>'))
       .pipe(replace('[mso_bg_close]', '<![endif]-->'))
-      
+
       .pipe(replace('[not_mso_open]', '<!--[if !gte mso 11]><!---->'))
       .pipe(replace('[not_mso_close]', '<!--<![endif]-->'))
-      
+
       .pipe(gulpif(animationCheck, replace('[animation_css]', animationCss)))
-      
+
       .pipe(rename({
         dirname: dir
       }))
@@ -149,17 +149,17 @@ function assembleOutput(dir, type, min) {
   switch (type) {
     case "email":
       runSequence('assembleEmail--'+dir,'juiceEmail--'+dir, 'emailsJson', htmlInjector);
-      
+
       break;
-    
+
     case "styles":
       runSequence('assembleStyles--'+dir,'juiceEmail--'+dir, htmlInjector);
-      
+
       break;
-   
+
     case "both":
       runSequence('assembleEmail--'+dir,'assembleStyles--'+dir,'juiceEmail--'+dir, 'emailsJson', htmlInjector);
-      
+
       break;
   }
 };
@@ -168,7 +168,7 @@ function assembleOutput(dir, type, min) {
 // ### Image processing function
 function processImages(dir,file) {
   file = file || '';
-  
+
   gulp.task('images', function() {
     return gulp.src(file == '' ? [path.join(paths.shared, '/images/**/*.{jpeg,jpg,gif,png}'),path.join(paths.emails, dir, '/images/**/*.{jpeg,jpg,gif,png}')] : file)
       .pipe(imagemin({
@@ -180,9 +180,9 @@ function processImages(dir,file) {
         dirname: dir + '/images'
       }))
       .pipe(gulp.dest(paths.dist))
-      .pipe(browserSync.stream()); 
+      .pipe(browserSync.stream());
   });
-  
+
   gulp.start('images');
 }
 
@@ -230,133 +230,134 @@ gulp.task('serve', function() {
     port: 8080,
     server: "./",
     startPath: "/preview",
-    codeSync: false
+    codeSync: false,
+    notify: false
   });
-  
+
   var folders = getFolders(paths.emails);
   var tasks = folders.map(function(folder) {
     assmbleApps[folder] = assemble();
     assembleFolder(folder);
   });
-  
+
   //Images Folder Watch
   gulp.watch(path.join(paths.emails, '/**/images/**/*.{jpeg,jpg,gif,png}')).on('change', function (file) {
     var currentFolder = getCurrentFolder(file.path,'emails');
-    
+
     switch (file.type) {
       case "renamed":
         //Remove old
         var filePath = path.parse(file.old);
-        
+
         var oldFilePath = path.join(currentFolder , "/images", filePath.name + filePath.ext);
         var oldDestFilePath = path.resolve(paths.dist, oldFilePath);
-        
+
         del(oldDestFilePath);
-      
+
         break;
-        
+
       case "deleted":
         var filePath = path.parse(file.path);
-        
+
         var filePath = path.join(currentFolder , "/images", filePath.name + filePath.ext);
         var destFilePath = path.resolve(paths.dist, filePath);
-        
+
         del(destFilePath);
-      
+
         break;
     }
     processImages(currentFolder,file.path);
-  
+
   });
-  
+
   //Styles Folder Watch
   gulp.watch(path.join(paths.emails, '/**/styles/**/*.{scss,less}')).on('change', function (file) {
     var currentFolder = getCurrentFolder(file.path,'emails');
-      
+
     assembleOutput(currentFolder,'styles');
-    
+
   });
-  
+
   //Email Folder Watch
   gulp.watch(path.join(paths.emails, '/**/*.{hbs,json,yml}')).on('change', function (file) {
     var currentFolder = getCurrentFolder(file.path,'emails');
-    
+
     switch (file.type) {
       case "renamed":
         //Remove old
         var oldPathArray = file.old.split(path.sep);
         var oldFilename = oldPathArray[oldPathArray.length-1];
         oldFilename = oldFilename.substr(0, oldFilename.lastIndexOf('.'));
-        
+
         var oldFilePath = path.join(currentFolder, oldFilename + ".html");
         var oldDestFilePath = path.resolve(paths.dist, oldFilePath);
-        
+
         del(oldDestFilePath);
-      
+
         break;
-        
+
       case "deleted":
         var pathArray = file.path.split(path.sep);
         var filename = pathArray[pathArray.length-1];
         filename = filename.substr(0, filename.lastIndexOf('.'));
-        
+
         var filePath = path.join(currentFolder, filename + ".html");
         var destFilePath = path.resolve(paths.dist, filePath);
-        
+
         del(destFilePath);
-      
+
         break;
-    }    
+    }
     assembleFolder(currentFolder);
     assembleOutput(currentFolder);
-    
+
   });
-  
+
   //Shared Image Folder Watch
   gulp.watch(path.join(paths.shared, '/images/**/*.{jpeg,jpg,gif,png}')).on('change', function (file) {
     var folders = getFolders(paths.emails);
-    
+
     var tasks = folders.map(function(currentFolder) {
       switch (file.type) {
       case "renamed":
         //Remove old
         var filePath = path.parse(file.old);
-        
+
         var oldFilePath = path.join(currentFolder , "/images", filePath.name + filePath.ext);
         var oldDestFilePath = path.resolve(paths.dist, oldFilePath);
-        
+
         del(oldDestFilePath);
-      
+
         break;
-        
+
       case "deleted":
         var filePath = path.parse(file.path);
-        
+
         var filePath = path.join(currentFolder , "/images", filePath.name + filePath.ext);
         var destFilePath = path.resolve(paths.dist, filePath);
-        
+
         del(destFilePath);
-      
+
         break;
       }
       processImages(currentFolder);
-      
+
     });
   });
-  
+
   //Shared Email Folder Watch
   gulp.watch(path.join(paths.shared, '/**/*.{hbs,json,yml}')).on('change', function (file) {
     var folders = getFolders(paths.emails);
-    
+
     var tasks = folders.map(function(currentFolder) {
       assembleFolder(currentFolder);
       assembleOutput(currentFolder,'both');
     });
   });
-  
+
 });
 
-gulp.task('s3upload', function(callback) {  
+gulp.task('s3upload', function(callback) {
   var folders = getFolders(paths.emails);
 
   var tasks = folders.map(function(dir) {
@@ -369,21 +370,21 @@ gulp.task('s3upload', function(callback) {
               return new_name;
           }
       }));
-      
+
     gulp.src(path.join(paths.dist, dir, '/**/*.html'))
       .pipe(debug({title: 'S3 Replace:'}))
-      
+
       .pipe(replace(/images\/(\S+\.)(png|jpe?g|gif)/ig, s3Config.baseUrl+'/'+s3Config.bucket+'/mail_images/'+dir+'/$1$2'))
-      
-      .pipe(gulp.dest(path.join(paths.dist, dir))); 
+
+      .pipe(gulp.dest(path.join(paths.dist, dir)));
   });
-  
+
   callback;
 });
 
 
 // ### Preview Stylesheets
-gulp.task('previewStyles', function() {  
+gulp.task('previewStyles', function() {
   return gulp.src(path.join(paths.preview, '/styles/scss/**/*.scss'))
     .pipe(debug({title: 'Preview Sass:'}))
     .pipe(sourcemaps.init())
@@ -401,7 +402,7 @@ gulp.task('previewStyles', function() {
         'android 4',
         'opera 12'
       ]})
-    )     
+    )
     .pipe(sourcemaps.write())
     .pipe(rename({
       dirname: '/styles'
@@ -421,7 +422,7 @@ gulp.task('build', function(callback) {
     assembleFolder(currentFolder);
     assembleOutput(currentFolder,'both');
   });
-  
+
   callback;
 });
 

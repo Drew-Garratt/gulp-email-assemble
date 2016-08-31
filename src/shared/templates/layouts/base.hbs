@@ -16,7 +16,11 @@ xmlns:o="urn:schemas-microsoft-com:office:office">
 <link rel="stylesheet" href="styles/{{ webfont }}.css" data-embed>
 <!--<![endif]-->
 {{/if}}
+{{#if styles}}
+<link href="styles/{{ styles }}.css" media="all" rel="stylesheet" type="text/css" />
+{{else}}
 <link href="styles/main.css" media="all" rel="stylesheet" type="text/css" />
+{{/if}}
 <!--[if gte mso 9]><xml>
 <o:OfficeDocumentSettings>
 <o:AllowPNG/>
