@@ -143,6 +143,9 @@ function assembleOutput(dir, type, min) {
         .pipe(replace('[not_mso_open]', '<!--[if !gte mso 11]><!---->'))
         .pipe(replace('[not_mso_close]', '<!--<![endif]-->'))
 
+        .pipe(replace('[google_font_open]', '<link href="'))
+        .pipe(replace('[google_font_close]', '" rel="stylesheet">'))
+
         .pipe(gulpif(animationCheck, replace('[animation_css]', '<style type="text/css">'+animationCss+'</style>')))
 
         .pipe(rename({

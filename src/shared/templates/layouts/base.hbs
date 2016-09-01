@@ -14,6 +14,11 @@ xmlns:o="urn:schemas-microsoft-com:office:office">
 <link rel="stylesheet" href="styles/{{ webfont }}.css" data-embed>
 <!--<![endif]-->
 {{/if}}
+{{#if googlefont_href}}
+<!--[if !mso]><!-- -->
+[google_font_open]{{ googlefont_href }}[google_font_close]
+<!--<![endif]-->
+{{/if}}
 {{#if styles}}
 <link href="styles/{{ styles }}.css" media="all" rel="stylesheet" type="text/css" />
 {{else}}
