@@ -1,30 +1,81 @@
 ---
 subject: Email Assemble
+animation: true
+googlefont_href: https://fonts.googleapis.com/css?family=Open+Sans:300,600
 ---
 <table>
   <tr>
-    <td id="intro" class="p0">
+    <td id="hero" class="p0">
+      {{#> background-image width="100%" width_pixels="600px" height="300px" image="images/hero-bg.gif" colour="#000000"}}
+      <td class="p0">
+        <table>
+          <tr>
+            {{> spacer width='100%' height='75px' }}
+          </tr>
+          <tr>
+            {{#> columns class='p0'}}
+              <tr>
+                {{#> column name='outer' width='150px'}}{{/column}}
+
+                {{#> column name='middle' width='300px' class='fadeIn0'}}
+                  <!-- Because we have a background image we need to pad with columns rather than css -->
+                  <table class="title title__outer">
+                    <tr>
+                      {{> spacer width='30px' height='25px' }}
+                      <td class="title title__inner">
+                        <h1 class="webfont">Email Assemble!</h1>
+                      </td>
+                      {{> spacer width='30px' height='25px' }}
+                    </tr>
+                  </table>
+                {{/column}}
+
+                {{#> column name='outer' width='150px'}}{{/column}}
+              </tr>
+            {{/columns}}
+          </tr>
+          <tr>
+            {{> spacer width='100%' height='75px' }}
+          </tr>
+        </table>
+      </td>
+      {{/background-image}}
+    </td>
+  </tr>
+  <tr>
+    <td id="content">
       <table>
         <tr>
-          <td>spacer</td>
+          <td class="content content__outer">
+            <table>
+              <tr>
+                {{#> columns class='p0'}}
+                  <tr>
+                    {{#> column name='outer' width='70px'}}{{/column}}
+
+                    {{#> column name='middle' width='400px' class='content content__inner fadeIn1'}}
+                      <table>
+                        <tr>
+                          <td>
+                            <h2>Concentrate on&nbsp;creativity</h2><h2>not compatibility</h2>
+                          </td>
+                        </tr>
+                      </table>
+                    {{/column}}
+
+                    {{#> column name='outer' width='70px'}}{{/column}}
+                  </tr>
+                {{/columns}}
+              </tr>
+            </table>
+          </td>
         </tr>
         <tr>
-          <td>view online</td>
-        </tr>
-        <tr>
-          <td>spacer</td>
+          <td class="content content__outer">
+            <p>Create responsive HTML email. Include background images, animation, hover states, buttons and don't worry. Email Assemble comes isn't just a workflow. It comes with a host of helpers and examples to get you building and having fun with email again.</p>
+          </td>
         </tr>
       </table>
-    </td>
-  </tr>
-  <tr>
-    <td id="hero" class="p0">
-
-    </td>
-  </tr>
-  <tr>
-    <td id="content" class="p0">
-
     </td>
   </tr>
   <tr>

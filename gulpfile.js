@@ -64,6 +64,10 @@ var enabled = {
   maps: !argv.production
 };
 
+//
+var emailFolder = (argv.email === undefined) ? false : true;
+var emailTemplate = (argv.template === undefined) ? false : true;
+
 
 // ### CSS processing function
 function assembleOutput(dir, type, min) {
@@ -71,8 +75,20 @@ function assembleOutput(dir, type, min) {
   min = min || false;
 
 
-  //Assemble Emails
-  gulp.task('assembleEmail--'+dir, function() {
+  gulp.task('assembleLoad--'+dir, function(cb) {
+    assmbleApps[dir] = assemble();
+    assmbleApps[dir].dataLoader('yml', function(str, fp) {
+      return yaml.safeLoad(str);
+    });
+    assmbleApps[dir].partials([path.join(paths.shared, '/templates/partials/**/*.hbs'),path.join(paths.emails, dir, '/templates/partials/**/*.hbs')]);
+    assmbleApps[dir].layouts([path.join(paths.shared, '/templates/layouts/**/*.hbs'),path.join(paths.emails, dir, '/templates/layouts/**/*.hbs')]);
+    assmbleApps[dir].pages(path.join(paths.emails, dir, '/templates/email/**/*.hbs'));
+    assmbleApps[dir].data([path.join(paths.shared, '/data/**/*.{json,yml}'),path.join(paths.emails, dir, '/data/**/*.{json,yml}')]);
+    assmbleApps[dir].option('layout', 'base');
+    cb();
+  });
+
+  gulp.task('assembleEmail--'+dir, ['assembleLoad--'+dir], function() {
     return assmbleApps[dir].toStream('pages')
       .pipe(debug({title: 'Assemble Email:'}))
       .pipe(assmbleApps[dir].renderFile())
@@ -156,21 +172,58 @@ function assembleOutput(dir, type, min) {
 
   });
 
+
+  //S3 Upload
+  gulp.task('s3upload', function(callback) {
+    gulp.src([path.join(paths.shared, '/images/**/*.{jpeg,jpg,gif,png}'),path.join(paths.emails, dir, '/images/**/*.{jpeg,jpg,gif,png}')])
+      .pipe(s3({
+          Bucket: s3Config.bucket,
+          ACL: 'public-read',
+          keyTransform: function(relative_filename) {
+              var new_name = 'mail_images/' + dir + '/' + relative_filename;
+              return new_name;
+          }
+      }));
+
+    gulp.src(path.join(paths.dist, dir, '/**/*.html'))
+      .pipe(debug({title: 'S3 Replace:'}))
+
+      .pipe(replace(/images\/(\S+\.)(png|jpe?g|gif)/ig, s3Config.baseUrl+'/'+s3Config.bucket+'/mail_images/'+dir+'/$1$2'))
+
+      .pipe(gulp.dest(path.join(paths.dist, dir)));
+
+    callback();
+  });
+
   //Assemble Switch
+
   //accepts 'email', 'styles' or 'both'
+  //enabled.s3 is also checked for asset upload
   switch (type) {
     case "email":
-      runSequence('assembleEmail--'+dir,'juiceEmail--'+dir, 'emailsJson', htmlInjector);
+      if(!enabled.s3) {
+        runSequence('assembleEmail--'+dir,'juiceEmail--'+dir, 'emailsJson', htmlInjector);
+      } else {
+        runSequence('assembleEmail--'+dir,'juiceEmail--'+dir, 'emailsJson', 's3upload', htmlInjector);
+      }
 
       break;
 
     case "styles":
-      runSequence('assembleStyles--'+dir,'juiceEmail--'+dir, htmlInjector);
+      if(!enabled.s3) {
+        runSequence('assembleStyles--'+dir,'juiceEmail--'+dir, htmlInjector);
+      } else {
+        runSequence('assembleStyles--'+dir,'juiceEmail--'+dir, 's3upload', htmlInjector);
+      }
 
       break;
 
     case "both":
-      runSequence('assembleEmail--'+dir,'assembleStyles--'+dir,'juiceEmail--'+dir, 'emailsJson', htmlInjector);
+      if(!enabled.s3) {
+        runSequence('assembleEmail--'+dir,'assembleStyles--'+dir,'juiceEmail--'+dir, 'emailsJson', htmlInjector);
+      } else {
+        runSequence('assembleEmail--'+dir,'assembleStyles--'+dir,'juiceEmail--'+dir, 'emailsJson', 's3upload', htmlInjector);
+      }
 
       break;
   }
@@ -214,20 +267,6 @@ function getCurrentFolder(filePath,type) {
   return currentFolder;
 }
 
-// ### Assemble App Collection Update
-function assembleFolder(dir) {
-  //Update Assemble App Sources
-  assmbleApps[dir] = assemble();
-  assmbleApps[dir].dataLoader('yml', function(str, fp) {
-    return yaml.safeLoad(str);
-  });
-  assmbleApps[dir].partials([path.join(paths.shared, '/templates/partials/**/*.hbs'),path.join(paths.emails, dir, '/templates/partials/**/*.hbs')]);
-  assmbleApps[dir].layouts([path.join(paths.shared, '/templates/layouts/**/*.hbs'),path.join(paths.emails, dir, '/templates/layouts/**/*.hbs')]);
-  assmbleApps[dir].pages(path.join(paths.emails, dir, '/templates/email/**/*.hbs'));
-  assmbleApps[dir].data([path.join(paths.shared, '/data/**/*.{json,yml}'),path.join(paths.emails, dir, '/data/**/*.{json,yml}')]);
-  assmbleApps[dir].option('layout', 'base');
-};
-
 // ### Clean
 // `gulp clean` - Deletes the dist and assemble folder entirely.
 gulp.task('clean', require('del').bind(null, [paths.dist,paths.assemble]));
@@ -252,7 +291,6 @@ gulp.task('serve', function() {
   var folders = getFolders(paths.emails);
   var tasks = folders.map(function(folder) {
     assmbleApps[folder] = assemble();
-    assembleFolder(folder);
   });
 
   //Images Folder Watch
@@ -323,7 +361,6 @@ gulp.task('serve', function() {
 
         break;
     }
-    assembleFolder(currentFolder);
     assembleOutput(currentFolder);
 
   });
@@ -365,36 +402,10 @@ gulp.task('serve', function() {
     var folders = getFolders(paths.emails);
 
     var tasks = folders.map(function(currentFolder) {
-      assembleFolder(currentFolder);
       assembleOutput(currentFolder,'both');
     });
   });
 
-});
-
-gulp.task('s3upload', function(callback) {
-  var folders = getFolders(paths.emails);
-
-  var tasks = folders.map(function(dir) {
-    gulp.src([path.join(paths.shared, '/images/**/*.{jpeg,jpg,gif,png}'),path.join(paths.emails, dir, '/images/**/*.{jpeg,jpg,gif,png}')])
-      .pipe(s3({
-          Bucket: s3Config.bucket,
-          ACL: 'public-read',
-          keyTransform: function(relative_filename) {
-              var new_name = 'mail_images/' + dir + '/' + relative_filename;
-              return new_name;
-          }
-      }));
-
-    gulp.src(path.join(paths.dist, dir, '/**/*.html'))
-      .pipe(debug({title: 'S3 Replace:'}))
-
-      .pipe(replace(/images\/(\S+\.)(png|jpe?g|gif)/ig, s3Config.baseUrl+'/'+s3Config.bucket+'/mail_images/'+dir+'/$1$2'))
-
-      .pipe(gulp.dest(path.join(paths.dist, dir)));
-  });
-
-  callback;
 });
 
 
@@ -434,11 +445,10 @@ gulp.task('build', function(callback) {
 
   var tasks = folders.map(function(currentFolder) {
     processImages(currentFolder);
-    assembleFolder(currentFolder);
     assembleOutput(currentFolder,'both');
   });
 
-  callback;
+  callback();
 });
 
 // ### Email List to Json
@@ -453,9 +463,5 @@ gulp.task('emailsJson', function() {
 // ### Gulp
 // `gulp` - Run a complete build. To compile for production run `gulp --production`.
 gulp.task('default', ['clean'], function() {
-  if(!enabled.s3) {
-    gulp.start('previewStyles','build');
-  } else {
-    gulp.start('previewStyles','build','s3upload');
-  }
+  runSequence('previewStyles','build');
 });
