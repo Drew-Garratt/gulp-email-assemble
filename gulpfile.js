@@ -74,7 +74,7 @@ function assembleOutput(dir, type, min) {
   type = type || 'email';
   min = min || false;
 
-
+  //Load Assemble App Per Folder
   gulp.task('assembleLoad--'+dir, function(cb) {
     assmbleApps[dir] = assemble();
     assmbleApps[dir].dataLoader('yml', function(str, fp) {
@@ -88,6 +88,7 @@ function assembleOutput(dir, type, min) {
     cb();
   });
 
+  //Assemble Content per Folder (Load content first)
   gulp.task('assembleEmail--'+dir, ['assembleLoad--'+dir], function() {
     return assmbleApps[dir].toStream('pages')
       .pipe(debug({title: 'Assemble Email:'}))
@@ -142,6 +143,7 @@ function assembleOutput(dir, type, min) {
       }
     });
 
+    //Replace IE conditionals. Google Font Conditionals and Inject Animation CSS
     function juiceReplace(animationCheck,animationCss) {
       return gulp.src(path.join(paths.assemble, dir, '/**/*.html'))
         .pipe(debug({title: 'Juice Email:'}))
@@ -171,7 +173,6 @@ function assembleOutput(dir, type, min) {
     }
 
   });
-
 
   //S3 Upload
   gulp.task('s3upload', function(callback) {
