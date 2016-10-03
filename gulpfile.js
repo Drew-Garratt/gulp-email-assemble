@@ -85,6 +85,7 @@ function assembleOutput(dir, type, min) {
     assmbleApps[dir].pages(path.join(paths.emails, dir, '/templates/email/**/*.hbs'));
     assmbleApps[dir].data([path.join(paths.shared, '/data/**/*.{json,yml}'),path.join(paths.emails, dir, '/data/**/*.{json,yml}')]);
     assmbleApps[dir].option('layout', 'base');
+
     cb();
   });
 
@@ -137,45 +138,38 @@ function assembleOutput(dir, type, min) {
       if(err == null) {
         animationCheck = true;
         animationCss = fs.readFileSync(path.join(paths.assemble, dir, '/styles/animation.css'), "utf8");
-        juiceReplace(animationCheck,animationCss);
-      } else {
-        juiceReplace(animationCheck,animationCss);
       }
     });
 
-    //Replace IE conditionals. Google Font Conditionals and Inject Animation CSS
-    function juiceReplace(animationCheck,animationCss) {
-      return gulp.src(path.join(paths.assemble, dir, '/**/*.html'))
-        .pipe(debug({title: 'Juice Email:'}))
-        .pipe(juice(juiceOptions))
+    return gulp.src(path.join(paths.assemble, dir, '/**/*.html'))
+      .pipe(debug({title: 'Juice Email:'}))
+      .pipe(juice(juiceOptions))
 
-        .pipe(replace('[mso_open]', '<!--[if (gte mso 9)|(IE)]>'))
-        .pipe(replace('[mso_close]', '<![endif]-->'))
+      .pipe(replace('[mso_open]', '<!--[if (gte mso 9)|(IE)]>'))
+      .pipe(replace('[mso_close]', '<![endif]-->'))
 
-        .pipe(replace('[mso_11_open]', '<!--[if gte mso 11]>'))
-        .pipe(replace('[mso_11_close]', '<![endif]-->'))
+      .pipe(replace('[mso_11_open]', '<!--[if gte mso 11]>'))
+      .pipe(replace('[mso_11_close]', '<![endif]-->'))
 
-        .pipe(replace('[mso_bg_open]', '<!--[if gte mso 11]>'))
-        .pipe(replace('[mso_bg_close]', '<![endif]-->'))
+      .pipe(replace('[mso_bg_open]', '<!--[if gte mso 11]>'))
+      .pipe(replace('[mso_bg_close]', '<![endif]-->'))
 
-        .pipe(replace('[not_mso_open]', '<!--[if !gte mso 11]><!---->'))
-        .pipe(replace('[not_mso_close]', '<!--<![endif]-->'))
+      .pipe(replace('[not_mso_open]', '<!--[if !gte mso 11]><!---->'))
+      .pipe(replace('[not_mso_close]', '<!--<![endif]-->'))
 
-        .pipe(replace('[google_font_open]', '<link href="'))
-        .pipe(replace('[google_font_close]', '" rel="stylesheet">'))
+      .pipe(replace('[google_font_open]', '<link href="'))
+      .pipe(replace('[google_font_close]', '" rel="stylesheet">'))
 
-        .pipe(gulpif(animationCheck, replace('[animation_css]', '<style type="text/css">'+animationCss+'</style>')))
+      .pipe(gulpif(animationCheck, replace('[animation_css]', '<style type="text/css">'+animationCss+'</style>')))
 
-        .pipe(rename({
-          dirname: dir
-        }))
-        .pipe(gulp.dest(paths.dist));
-    }
-
+      .pipe(rename({
+        dirname: dir
+      }))
+      .pipe(gulp.dest(paths.dist));
   });
 
   //S3 Upload
-  gulp.task('s3upload', function(callback) {
+  gulp.task('s3upload--'+dir, function(callback) {
     gulp.src([path.join(paths.shared, '/images/**/*.{jpeg,jpg,gif,png}'),path.join(paths.emails, dir, '/images/**/*.{jpeg,jpg,gif,png}')])
       .pipe(s3({
           Bucket: s3Config.bucket,
@@ -187,7 +181,7 @@ function assembleOutput(dir, type, min) {
       }));
 
     gulp.src(path.join(paths.dist, dir, '/**/*.html'))
-      .pipe(debug({title: 'S3 Replace:'}))
+      .pipe(debug({title: 'S3 Replace:'+dir}))
 
       .pipe(replace(/images\/(\S+\.)(png|jpe?g|gif)/ig, s3Config.baseUrl+'/'+s3Config.bucket+'/mail_images/'+dir+'/$1$2'))
 
@@ -205,7 +199,7 @@ function assembleOutput(dir, type, min) {
       if(!enabled.s3) {
         runSequence('assembleEmail--'+dir,'juiceEmail--'+dir, 'emailsJson', htmlInjector);
       } else {
-        runSequence('assembleEmail--'+dir,'juiceEmail--'+dir, 'emailsJson', 's3upload', htmlInjector);
+        runSequence('assembleEmail--'+dir,'juiceEmail--'+dir, 's3upload--'+dir, 'emailsJson', htmlInjector);
       }
 
       break;
@@ -214,7 +208,7 @@ function assembleOutput(dir, type, min) {
       if(!enabled.s3) {
         runSequence('assembleStyles--'+dir,'juiceEmail--'+dir, htmlInjector);
       } else {
-        runSequence('assembleStyles--'+dir,'juiceEmail--'+dir, 's3upload', htmlInjector);
+        runSequence('assembleStyles--'+dir,'juiceEmail--'+dir, 's3upload--'+dir, htmlInjector);
       }
 
       break;
@@ -223,7 +217,7 @@ function assembleOutput(dir, type, min) {
       if(!enabled.s3) {
         runSequence('assembleEmail--'+dir,'assembleStyles--'+dir,'juiceEmail--'+dir, 'emailsJson', htmlInjector);
       } else {
-        runSequence('assembleEmail--'+dir,'assembleStyles--'+dir,'juiceEmail--'+dir, 'emailsJson', 's3upload', htmlInjector);
+        runSequence('assembleEmail--'+dir,'assembleStyles--'+dir,'juiceEmail--'+dir, 's3upload--'+dir, 'emailsJson', htmlInjector);
       }
 
       break;
