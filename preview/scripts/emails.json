@@ -1,8 +1,11 @@
 [
+<<<<<<< HEAD
   "assemble_demo/mail-1.html",
   "christmas/mail.html",
   "legrande/mail-1.html",
   "legrande/mail-2.html",
   "legrande/mail-3.html",
+=======
+>>>>>>> 091d1885844fcd1d70a7f23deac59d3b684ff782
   "test/default.html"
 ]
