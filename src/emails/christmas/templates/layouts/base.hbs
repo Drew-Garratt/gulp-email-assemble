@@ -1,0 +1,45 @@
+<!doctype html>
+<html xmlns="http://www.w3.org/1999/xhtml"
+xmlns:v="urn:schemas-microsoft-com:vml"
+xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<title>{{ subject }}</title>
+[animation_css]
+<link href="styles/main.css" media="all" rel="stylesheet" type="text/css" />
+<!--[if gte mso 9]><xml>
+<o:OfficeDocumentSettings>
+<o:AllowPNG/>
+<o:PixelsPerInch>96</o:PixelsPerInch>
+</o:OfficeDocumentSettings>
+</xml>
+<![endif]-->
+<!--[if gte mso 12]>
+<style>
+ul {
+  display: block;
+	margin: 0 0 0 24px;
+	padding: 0;
+	list-style-position: inside;
+}
+</style>
+<![endif]-->
+</head>
+
+<body>
+
+<table class="body">
+	<tr>
+		<td class="outer"></td>
+		<td class="container">
+			[mso_open]<table class="inner-container"><tr><td>[mso_close]
+			<div class="content">{% body %}</div>
+	    [mso_open]</td></tr></table>[mso_close]
+		</td>
+		<td class="outer"></td>
+	</tr>
+</table>
+
+</body>
+</html>

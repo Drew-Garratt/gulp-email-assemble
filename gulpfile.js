@@ -64,19 +64,37 @@ var enabled = {
   maps: !argv.production
 };
 
+//
+var emailFolder = (argv.email === undefined) ? false : true;
+var emailTemplate = (argv.template === undefined) ? false : true;
+
 
 // ### CSS processing function
 function assembleOutput(dir, type, min) {
   type = type || 'email';
   min = min || false;
 
+  //Load Assemble App Per Folder
+  gulp.task('assembleLoad--'+dir, function(cb) {
+    assmbleApps[dir] = assemble();
+    assmbleApps[dir].dataLoader('yml', function(str, fp) {
+      return yaml.safeLoad(str);
+    });
+    assmbleApps[dir].partials([path.join(paths.shared, '/templates/partials/**/*.hbs'),path.join(paths.emails, dir, '/templates/partials/**/*.hbs')]);
+    assmbleApps[dir].layouts([path.join(paths.shared, '/templates/layouts/**/*.hbs'),path.join(paths.emails, dir, '/templates/layouts/**/*.hbs')]);
+    assmbleApps[dir].pages(path.join(paths.emails, dir, '/templates/email/**/*.hbs'));
+    assmbleApps[dir].data([path.join(paths.shared, '/data/**/*.{json,yml}'),path.join(paths.emails, dir, '/data/**/*.{json,yml}')]);
+    assmbleApps[dir].option('layout', 'base');
 
-  //Assemble Emails
-  gulp.task('assembleEmail--'+dir, function() {
+    cb();
+  });
+
+  //Assemble Content per Folder (Load content first)
+  gulp.task('assembleEmail--'+dir, ['assembleLoad--'+dir], function() {
     return assmbleApps[dir].toStream('pages')
       .pipe(debug({title: 'Assemble Email:'}))
       .pipe(assmbleApps[dir].renderFile())
-      .pipe(htmlmin({collapseWhitespace: true}))
+      //.pipe(htmlmin({collapseWhitespace: true}))
       .pipe(extname())
       .pipe(rename({
         dirname: dir
@@ -120,57 +138,93 @@ function assembleOutput(dir, type, min) {
       if(err == null) {
         animationCheck = true;
         animationCss = fs.readFileSync(path.join(paths.assemble, dir, '/styles/animation.css'), "utf8");
-        juiceReplace(animationCheck,animationCss);
-      } else {
-        juiceReplace(animationCheck,animationCss);
       }
     });
 
-    function juiceReplace(animationCheck,animationCss) {
-      return gulp.src(path.join(paths.assemble, dir, '/**/*.html'))
-        .pipe(debug({title: 'Juice Email:'}))
-        .pipe(juice(juiceOptions))
+    return gulp.src(path.join(paths.assemble, dir, '/**/*.html'))
+      .pipe(debug({title: 'Juice Email:'}))
+      .pipe(juice(juiceOptions))
 
-        .pipe(replace('[mso_open]', '<!--[if (gte mso 9)|(IE)]>'))
-        .pipe(replace('[mso_close]', '<![endif]-->'))
+      .pipe(replace('[mso_open]', '<!--[if (gte mso 9)|(IE)]>'))
+      .pipe(replace('[mso_close]', '<![endif]-->'))
 
-        .pipe(replace('[mso_11_open]', '<!--[if gte mso 11]>'))
-        .pipe(replace('[mso_11_close]', '<![endif]-->'))
+      .pipe(replace('[mso_11_open]', '<!--[if gte mso 11]>'))
+      .pipe(replace('[mso_11_close]', '<![endif]-->'))
 
-        .pipe(replace('[mso_bg_open]', '<!--[if gte mso 11]>'))
-        .pipe(replace('[mso_bg_close]', '<![endif]-->'))
+      .pipe(replace('[mso_bg_open]', '<!--[if gte mso 11]>'))
+      .pipe(replace('[mso_bg_close]', '<![endif]-->'))
 
-        .pipe(replace('[not_mso_open]', '<!--[if !gte mso 11]><!---->'))
-        .pipe(replace('[not_mso_close]', '<!--<![endif]-->'))
+      .pipe(replace('[not_mso_open]', '<!--[if !gte mso 11]><!---->'))
+      .pipe(replace('[not_mso_close]', '<!--<![endif]-->'))
 
-        .pipe(replace('[google_font_open]', '<link href="'))
-        .pipe(replace('[google_font_close]', '" rel="stylesheet">'))
+      .pipe(replace('[go_mso_open]', '<!--[if mso]><!---->'))
+      .pipe(replace('[go_mso_close]', '<!--<![endif]-->'))
 
-        .pipe(gulpif(animationCheck, replace('[animation_css]', '<style type="text/css">'+animationCss+'</style>')))
+      .pipe(replace('[no_mso_open]', '<!--[if !mso]><!---->'))
+      .pipe(replace('[no_mso_close]', '<!--<![endif]-->'))
 
-        .pipe(rename({
-          dirname: dir
-        }))
-        .pipe(gulp.dest(paths.dist));
-    }
+      .pipe(replace('[google_font_open]', '<link href="'))
+      .pipe(replace('[google_font_close]', '" rel="stylesheet">'))
 
+      .pipe(gulpif(animationCheck, replace('[animation_css]', '<style type="text/css">'+animationCss+'</style>')))
+
+      .pipe(rename({
+        dirname: dir
+      }))
+      .pipe(gulp.dest(paths.dist));
+  });
+
+  //S3 Upload
+  gulp.task('s3upload--'+dir, function(callback) {
+    gulp.src([path.join(paths.shared, '/images/**/*.{jpeg,jpg,gif,png}'),path.join(paths.emails, dir, '/images/**/*.{jpeg,jpg,gif,png}')])
+      .pipe(s3({
+          Bucket: s3Config.bucket,
+          ACL: 'public-read',
+          keyTransform: function(relative_filename) {
+              var new_name = 'mail_images/' + dir + '/' + relative_filename;
+              return new_name;
+          }
+      }));
+
+    gulp.src(path.join(paths.dist, dir, '/**/*.html'))
+      .pipe(debug({title: 'S3 Replace:'+dir}))
+
+      .pipe(replace(/images\/(\S+\.)(png|jpe?g|gif)/ig, s3Config.baseUrl+'/'+s3Config.bucket+'/mail_images/'+dir+'/$1$2'))
+
+      .pipe(gulp.dest(path.join(paths.dist, dir)));
+
+    callback();
   });
 
   //Assemble Switch
+
   //accepts 'email', 'styles' or 'both'
+  //enabled.s3 is also checked for asset upload
   switch (type) {
     case "email":
-      runSequence('assembleEmail--'+dir,'juiceEmail--'+dir, 'emailsJson', htmlInjector);
+      if(!enabled.s3) {
+        runSequence('assembleEmail--'+dir,'juiceEmail--'+dir, 'emailsJson', htmlInjector);
+      } else {
+        runSequence('assembleEmail--'+dir,'juiceEmail--'+dir, 's3upload--'+dir, 'emailsJson', htmlInjector);
+      }
 
       break;
 
     case "styles":
-      runSequence('assembleStyles--'+dir,'juiceEmail--'+dir, htmlInjector);
+      if(!enabled.s3) {
+        runSequence('assembleStyles--'+dir,'juiceEmail--'+dir, htmlInjector);
+      } else {
+        runSequence('assembleStyles--'+dir,'juiceEmail--'+dir, 's3upload--'+dir, htmlInjector);
+      }
 
       break;
 
     case "both":
-      runSequence('assembleEmail--'+dir,'assembleStyles--'+dir,'juiceEmail--'+dir, 'emailsJson', htmlInjector);
+      if(!enabled.s3) {
+        runSequence('assembleEmail--'+dir,'assembleStyles--'+dir,'juiceEmail--'+dir, 'emailsJson', htmlInjector);
+      } else {
+        runSequence('assembleEmail--'+dir,'assembleStyles--'+dir,'juiceEmail--'+dir, 's3upload--'+dir, 'emailsJson', htmlInjector);
+      }
 
       break;
   }
@@ -214,20 +268,6 @@ function getCurrentFolder(filePath,type) {
   return currentFolder;
 }
 
-// ### Assemble App Collection Update
-function assembleFolder(dir) {
-  //Update Assemble App Sources
-  assmbleApps[dir] = assemble();
-  assmbleApps[dir].dataLoader('yml', function(str, fp) {
-    return yaml.safeLoad(str);
-  });
-  assmbleApps[dir].partials([path.join(paths.shared, '/templates/partials/**/*.hbs'),path.join(paths.emails, dir, '/templates/partials/**/*.hbs')]);
-  assmbleApps[dir].layouts([path.join(paths.shared, '/templates/layouts/**/*.hbs'),path.join(paths.emails, dir, '/templates/layouts/**/*.hbs')]);
-  assmbleApps[dir].pages(path.join(paths.emails, dir, '/templates/email/**/*.hbs'));
-  assmbleApps[dir].data([path.join(paths.shared, '/data/**/*.{json,yml}'),path.join(paths.emails, dir, '/data/**/*.{json,yml}')]);
-  assmbleApps[dir].option('layout', 'base');
-};
-
 // ### Clean
 // `gulp clean` - Deletes the dist and assemble folder entirely.
 gulp.task('clean', require('del').bind(null, [paths.dist,paths.assemble]));
@@ -252,7 +292,6 @@ gulp.task('serve', function() {
   var folders = getFolders(paths.emails);
   var tasks = folders.map(function(folder) {
     assmbleApps[folder] = assemble();
-    assembleFolder(folder);
   });
 
   //Images Folder Watch
@@ -323,7 +362,6 @@ gulp.task('serve', function() {
 
         break;
     }
-    assembleFolder(currentFolder);
     assembleOutput(currentFolder);
 
   });
@@ -365,36 +403,10 @@ gulp.task('serve', function() {
     var folders = getFolders(paths.emails);
 
     var tasks = folders.map(function(currentFolder) {
-      assembleFolder(currentFolder);
       assembleOutput(currentFolder,'both');
     });
   });
 
-});
-
-gulp.task('s3upload', function(callback) {
-  var folders = getFolders(paths.emails);
-
-  var tasks = folders.map(function(dir) {
-    gulp.src([path.join(paths.shared, '/images/**/*.{jpeg,jpg,gif,png}'),path.join(paths.emails, dir, '/images/**/*.{jpeg,jpg,gif,png}')])
-      .pipe(s3({
-          Bucket: s3Config.bucket,
-          ACL: 'public-read',
-          keyTransform: function(relative_filename) {
-              var new_name = 'mail_images/' + dir + '/' + relative_filename;
-              return new_name;
-          }
-      }));
-
-    gulp.src(path.join(paths.dist, dir, '/**/*.html'))
-      .pipe(debug({title: 'S3 Replace:'}))
-
-      .pipe(replace(/images\/(\S+\.)(png|jpe?g|gif)/ig, s3Config.baseUrl+'/'+s3Config.bucket+'/mail_images/'+dir+'/$1$2'))
-
-      .pipe(gulp.dest(path.join(paths.dist, dir)));
-  });
-
-  callback;
 });
 
 
@@ -434,8 +446,32 @@ gulp.task('build', function(callback) {
 
   var tasks = folders.map(function(currentFolder) {
     processImages(currentFolder);
-    assembleFolder(currentFolder);
     assembleOutput(currentFolder,'both');
+  });
+
+  callback();
+});
+
+gulp.task('s3upload', function(callback) {
+  var folders = getFolders(paths.emails);
+
+  var tasks = folders.map(function(dir) {
+    gulp.src([path.join(paths.shared, '/images/**/*.{jpeg,jpg,gif,png}'),path.join(paths.emails, dir, '/images/**/*.{jpeg,jpg,gif,png}')])
+      .pipe(s3({
+          Bucket: s3Config.bucket,
+          ACL: 'public-read',
+          keyTransform: function(relative_filename) {
+              var new_name = 'mail_images/' + dir + '/' + relative_filename;
+              return new_name;
+          }
+      }));
+
+    gulp.src(path.join(paths.dist, dir, '/**/*.html'))
+      .pipe(debug({title: 'S3 Replace:'}))
+
+      .pipe(replace(/images\/(\S+\.)(png|jpe?g|gif)/ig, s3Config.baseUrl+'/'+s3Config.bucket+'/mail_images/'+dir+'/$1$2'))
+
+      .pipe(gulp.dest(path.join(paths.dist, dir)));
   });
 
   callback;
@@ -453,9 +489,5 @@ gulp.task('emailsJson', function() {
 // ### Gulp
 // `gulp` - Run a complete build. To compile for production run `gulp --production`.
 gulp.task('default', ['clean'], function() {
-  if(!enabled.s3) {
-    gulp.start('previewStyles','build');
-  } else {
-    gulp.start('previewStyles','build','s3upload');
-  }
+  runSequence('previewStyles','build');
 });
