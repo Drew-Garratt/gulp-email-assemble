@@ -20,6 +20,10 @@ var replace      = require('gulp-replace');
 var debug        = require('gulp-debug');
 var toJson       = require('gulp-to-json');
 var htmlmin      = require('gulp-htmlmin');
+var map          = require('map-stream');
+
+var DOMParser     = require('xmldom').DOMParser;
+var XMLSerializer = require('xmldom').XMLSerializer;
 
 var assemble     = require('assemble');
 var helpers      = require('handlebars-helpers')();
@@ -32,7 +36,7 @@ var htmlInjector = require("bs-html-injector");
 
 browserSync.use(htmlInjector)
 
-var assmbleApps = [];
+var assembleApps = [];
 
 var s3Config = JSON.parse(fs.readFileSync('aws.json'));
 var s3       = require('gulp-s3-upload')(s3Config);
@@ -57,6 +61,11 @@ var juiceOptions = {
   }
 }
 
+var nonVisualElements = [ 'HEAD', 'TITLE', 'BASE', 'LINK', 'STYLE', 'META', 'SCRIPT', 'NOSCRIPT', '[owa]' ];
+
+// Minimum Size
+var minSize = '600px';
+
 // CLI options
 var enabled = {
   // Enable s3upload when `--production`
@@ -76,30 +85,74 @@ function assembleOutput(dir, type, min) {
 
   //Load Assemble App Per Folder
   gulp.task('assembleLoad--'+dir, function(cb) {
-    assmbleApps[dir] = assemble();
-    assmbleApps[dir].dataLoader('yml', function(str, fp) {
+    assembleApps[dir] = assemble();
+    assembleApps[dir].dataLoader('yml', function(str, fp) {
       return yaml.safeLoad(str);
     });
-    assmbleApps[dir].partials([path.join(paths.shared, '/templates/partials/**/*.hbs'),path.join(paths.emails, dir, '/templates/partials/**/*.hbs')]);
-    assmbleApps[dir].layouts([path.join(paths.shared, '/templates/layouts/**/*.hbs'),path.join(paths.emails, dir, '/templates/layouts/**/*.hbs')]);
-    assmbleApps[dir].pages(path.join(paths.emails, dir, '/templates/email/**/*.hbs'));
-    assmbleApps[dir].data([path.join(paths.shared, '/data/**/*.{json,yml}'),path.join(paths.emails, dir, '/data/**/*.{json,yml}')]);
-    assmbleApps[dir].option('layout', 'base');
+    assembleApps[dir].partials([path.join(paths.shared, '/templates/partials/**/*.hbs'),path.join(paths.emails, dir, '/templates/partials/**/*.hbs')]);
+    assembleApps[dir].layouts([path.join(paths.shared, '/templates/layouts/**/*.hbs'),path.join(paths.emails, dir, '/templates/layouts/**/*.hbs')]);
+    assembleApps[dir].pages(path.join(paths.emails, dir, '/templates/email/**/*.hbs'));
+    assembleApps[dir].data([path.join(paths.shared, '/data/**/*.{json,yml}'),path.join(paths.emails, dir, '/data/**/*.{json,yml}')]);
+    assembleApps[dir].option('layout', 'base');
+
+    assembleApps[dir].preRender(/\.hbs$/, function(view, next) {
+      // do something with `view`
+      // middlewear https://github.com/assemble/assemble/blob/b65fb6670f0b6da3a21c46f6184bc93c91d99dbd/support/docs/src/content/api/middleware.md
+      var matchAttributes = /(\S+)=["']?((?:.(?!["']?\s+(?:\S+)=|[>"']))+.)["']?/ig;
+
+      var eaTagSearch = /<(ea-([a-z\-_0-9]+))/ig;
+
+      var eaTags = [];
+      while ((result = eaTagSearch.exec(view.content)) !== null) {
+        if(!contains(eaTags,result[2])) {
+          eaTags[eaTags.length] = result[2];
+        }
+      }
+
+      for (var i = 0, len = eaTags.length; i < len; i++) {
+        var eTagSelfClose = new RegExp("<\\s*ea-"+eaTags[i]+"(?![\\w-]).*?\\\/>", "ig");
+        while ((result = eTagSelfClose.exec(view.content)) !== null) {
+          var openTag = result[0];
+          var attributes = '';
+          var match;
+          while ((match = matchAttributes.exec(result[0])) != null) {
+            var attributes = ' '+match[0];
+          }
+          view.content = view.content.replace(openTag, "{{ "+eaTags[i]+attributes+" }}");
+        }
+
+        var eTagOpen = new RegExp("<\\s*ea-"+eaTags[i]+"(?![\\w-]).*?>", "ig");
+        while ((result = eTagOpen.exec(view.content)) !== null) {
+          var openTag = result[0];
+          var attributes = '';
+          var match;
+          while ((match = matchAttributes.exec(result[0])) != null) {
+            var attributes = ' '+match[0];
+          }
+          view.content = view.content.replace(openTag, "{{#> "+eaTags[i]+attributes+" }}");
+        }
+
+        var eTagClose = new RegExp("<\/s*ea-"+eaTags[i]+"(?![\\w-]).*?>", "ig");
+        view.content = view.content.replace(eTagClose, "{{/ "+eaTags[i]+" }}");
+      }
+
+      next();
+    });
 
     cb();
   });
 
   //Assemble Content per Folder (Load content first)
   gulp.task('assembleEmail--'+dir, ['assembleLoad--'+dir], function() {
-    return assmbleApps[dir].toStream('pages')
+    return assembleApps[dir].toStream('pages')
       .pipe(debug({title: 'Assemble Email:'}))
-      .pipe(assmbleApps[dir].renderFile())
+      .pipe(assembleApps[dir].renderFile())
       //.pipe(htmlmin({collapseWhitespace: true}))
       .pipe(extname())
       .pipe(rename({
         dirname: dir
       }))
-      .pipe(assmbleApps[dir].dest(paths.assemble));
+      .pipe(assembleApps[dir].dest(paths.assemble));
   });
 
   //Assemble Stylesheets
@@ -143,28 +196,84 @@ function assembleOutput(dir, type, min) {
 
     return gulp.src(path.join(paths.assemble, dir, '/**/*.html'))
       .pipe(debug({title: 'Juice Email:'}))
-      .pipe(juice(juiceOptions))
+      .pipe(juice(juiceOptions,nonVisualElements))
 
-      .pipe(replace('[mso_open]', '<!--[if (gte mso 9)|(IE)]>'))
-      .pipe(replace('[mso_close]', '<![endif]-->'))
+      .pipe(map(function (file, cb) {
+        var contents = file.contents.toString('utf8');
 
-      .pipe(replace('[mso_11_open]', '<!--[if gte mso 11]>'))
-      .pipe(replace('[mso_11_close]', '<![endif]-->'))
+        //Parse and suppress warnings (no one needs to hear <br> whining)
+        parser = new DOMParser({
+          errorHandler:{
+            warning:function(w){},
+            error:function(e){console.error(e)}
+          }
+        });
+        xmlContents = parser.parseFromString(contents,"text/xml");
 
-      .pipe(replace('[mso_bg_open]', '<!--[if gte mso 11]>'))
-      .pipe(replace('[mso_bg_close]', '<![endif]-->'))
+        var styleTags = xmlContents.getElementsByTagName("style");
 
-      .pipe(replace('[not_mso_open]', '<!--[if !gte mso 11]><!---->'))
-      .pipe(replace('[not_mso_close]', '<!--<![endif]-->'))
+        var styleTagsContent = '';
 
-      .pipe(replace('[go_mso_open]', '<!--[if mso]><!---->'))
-      .pipe(replace('[go_mso_close]', '<!--<![endif]-->'))
+        var i;
+        for (i = 0; i < styleTags.length; i++) {
+          styleTagsContent += styleTags[i].firstChild.nodeValue;
 
-      .pipe(replace('[no_mso_open]', '<!--[if !mso]><!---->'))
-      .pipe(replace('[no_mso_close]', '<!--<![endif]-->'))
+          if(i != 0) {
+            xmlContents.getElementsByTagName("style")[i].parentNode.removeChild(xmlContents.getElementsByTagName("style")[i]);
+          }
+        }
+        xmlContents.getElementsByTagName("style")[0].firstChild.nodeValue = styleTagsContent;
 
-      .pipe(replace('[google_font_open]', '<link href="'))
-      .pipe(replace('[google_font_close]', '" rel="stylesheet">'))
+        contents = (new XMLSerializer()).serializeToString(xmlContents);
+
+        var matchMedia = /@media screen and \(min-width: 600px\)[^{]+\{([\s\S]+?})\s*}/g;
+        var matchMobileMedia = new RegExp("@media screen and \\(min-width: " + minSize + "\\)[^{]+\\{([\\s\\S]+?})\\s*}", "g");
+        var styles = /[.,#][a-z0-9- +.#]+[\s, \{]/gm;
+
+        var mobileStyles = '';
+        var mobileResult;
+        while ((mobileResult = matchMobileMedia.exec(contents)) !== null) {
+          mobileStyles += mobileResult[1];
+        }
+
+        var msoStyles = mobileStyles.replace(styles,'[owa] $&');
+
+        mediaGroupCount = 0;
+        contents = contents.replace(new RegExp("@media screen and \\(min-width: " + minSize + "\\)[^{]+\\{([\\s\\S]+?})\\s*}", "g"), function (match, capture) {
+          mediaGroupCount++;
+          if(mediaGroupCount==1) {
+            return '@media screen and (min-width: 600px) {'+mobileStyles+'\n}\n@media yahoo {'+mobileStyles+'\n}\n'+msoStyles+'\n';
+          }
+          else {
+            return '';
+          }
+        });
+
+        contents = contents.replace(/\[mso_open\]/g, '<!--[if (gte mso 9)|(IE)]>');
+
+        contents = contents.replace(/\[mso_close\]/g, '<![endif]-->');
+
+        contents = contents.replace(/\[mso_11_open\]/g, '<!--[if gte mso 11]>');
+        contents = contents.replace(/\[mso_11_close\]/g, '<![endif]-->');
+
+        contents = contents.replace(/\[mso_bg_open\]/g, '<!--[if gte mso 11]>');
+        contents = contents.replace(/\[mso_bg_close\]/g, '<![endif]-->');
+
+        contents = contents.replace(/\[not_mso_open\]/g, '<!--[if !gte mso 11]><!---->');
+        contents = contents.replace(/\[not_mso_close\]/g, '<!--<![endif]-->');
+
+        contents = contents.replace(/\[go_mso_open\]/g, '<!--[if mso]><!---->');
+        contents = contents.replace(/\[go_mso_close\]/g, '<!--<![endif]-->');
+
+        contents = contents.replace(/\[no_mso_open\]/g, '<!--[if !mso]><!---->');
+        contents = contents.replace(/\[no_mso_close\]/g, '<!--<![endif]-->');
+
+        contents = contents.replace(/\[google_font_open\]/g, '<link href="');
+        contents = contents.replace(/\[google_font_close\]/g, '" rel="stylesheet">');
+
+        file.contents = new Buffer(contents, 'utf8');
+        cb(null, file);
+      }))
 
       .pipe(gulpif(animationCheck, replace('[animation_css]', '<style type="text/css">'+animationCss+'</style>')))
 
@@ -268,6 +377,19 @@ function getCurrentFolder(filePath,type) {
   return currentFolder;
 }
 
+// ### Check for unique value in array
+function contains (array, value) {
+  var doesContain = false
+
+  for (var i = 0, length = array.length; i < length; i++) {
+    if (array[i] === value) {
+      doesContain = true
+      break
+    }
+  }
+  return doesContain
+}
+
 // ### Clean
 // `gulp clean` - Deletes the dist and assemble folder entirely.
 gulp.task('clean', require('del').bind(null, [paths.dist,paths.assemble]));
@@ -291,7 +413,7 @@ gulp.task('serve', function() {
 
   var folders = getFolders(paths.emails);
   var tasks = folders.map(function(folder) {
-    assmbleApps[folder] = assemble();
+    assembleApps[folder] = assemble();
   });
 
   //Images Folder Watch

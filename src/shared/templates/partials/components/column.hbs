@@ -1,5 +1,32 @@
-<td class="{{ name }}-col"{{#if width}} style="width:{{ width }}"{{/if}}>
-  [mso_close]
-  <div class="{{ name }} col{{#if class}} {{ class }}{{/if}}"{{#if width}} style="max-width:{{ width }}"{{/if}}>{{> @partial-block }}</div>
-  [mso_open]
+[mso_open]
+<td class="{{ name }}-col" role="presentation">
+[mso_close]
+  <div class="td {{ name }}{{#if class}} {{ class }}{{/if}}{{#if header}} thead{{/if}}{{#if footer}} tfoot{{/if}}">
+    {{> @partial-block }}
+  </div>
+[mso_open]
 </td>
+[mso_close]
+<style type="text/css">
+// Desktop
+@media screen and (min-width: 600px) {
+  .{{ name }} {
+    {{#if width}}width: {{width}};{{/if}}
+    {{#if padding}}padding: {{padding}};{{/if}}
+  }
+}
+.{{ name }}-col {
+  {{#if style}}{{style}};{{/if}}
+  {{#if width}}width: {{width}};{{/if}}
+  {{#if padding}}mso-padding-alt: {{padding}};{{/if}}
+}
+
+// Mobile
+.{{ name }} {
+  {{#if style}}{{style}};{{/if}}
+  {{#if width}}width: {{width}};{{/if}}
+  {{#if mobile-width}}width: {{mobile-width}};{{/if}}
+  {{#if padding}}padding: {{padding}};{{/if}}
+  {{#if padding-mobile}}padding: {{padding-mobile}};{{/if}}
+}
+</style>

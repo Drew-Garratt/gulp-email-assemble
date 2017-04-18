@@ -21,6 +21,7 @@ but will also shrink down on a phone or something */
 	width: 100%;
 }
 
+
 .inner-container {
   width: $width;
 	padding: 0;
@@ -39,6 +40,19 @@ but will also shrink down on a phone or something */
   padding: 0;
 }
 
+.section {
+  max-width: $width;
+  margin: 0 auto;
+
+  &-table {
+    width: $width;
+  }
+
+  table > tr > td {
+    align: center
+  }
+}
+
 /* This should also be a block element, so that it will fill 100% of the .container */
 .content {
   display: block;
@@ -46,8 +60,6 @@ but will also shrink down on a phone or something */
   padding: 0;
 	width: 100%;
   max-width: $width;
-  font-size: 0;
-  line-height: 0;
 }
 
 .spacer {
@@ -63,37 +75,4 @@ but will also shrink down on a phone or something */
 			display: block;
 		}
 	}
-}
-
-.td {
-  display: inline-block;
-  font-size: 0;
-  line-height: 0;
-}
-
-/* -------------------------------------
-    GRIDDING
-------------------------------------- */
-.wrapper {
-  padding: 0 round($columnPadding / 2);
-
-  &-single {
-    padding: 0 $columnPadding;
-  }
-}
-
-.column {
-  padding: 0 round($columnPadding / 2);
-
-  &-single {
-    padding: 0 $columnPadding;
-  }
-}
-
-// Responsive column component
-.col {
-  display: inline-block;
-  width: 100%;
-  font-size: 0;
-  line-height: 0;
 }

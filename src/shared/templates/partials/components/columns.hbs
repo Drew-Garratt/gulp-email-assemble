@@ -1,7 +1,7 @@
-<td class="columns{{#if class}} {{ class }}{{/if}}">
-  [mso_open]
-  <table>
-    {{> @partial-block }}
-  </table>
-  [mso_close]
-</td>
+<div class="table {{#if name}}{{ name }}{{/if}}">
+[mso_open]
+<table class="{{#if name}}{{ name }}-table{{/if}}" cellspacing="0" padding="0" border="0" width="100%" role="presentation">
+  <tr>[mso_close]{{> @partial-block }}[mso_open]</tr>
+</table>
+[mso_close]
+</div>
